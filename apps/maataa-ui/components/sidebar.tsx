@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BookOpen, Clapperboard, Cpu, Network, Radio, ShieldCheck, Sparkles, Wallet } from "lucide-react";
+import { Activity, BookOpen, Clapperboard, Cpu, Network, Radio, ShieldCheck, Sparkles, Wallet, BadgeCheck } from "lucide-react";
 
 const sections = [
   { href: "/dashboard", label: "Dashboard", icon: Activity },
   { href: "/runtime", label: "Runtime", icon: Cpu },
   { href: "/status", label: "Status Matrix", icon: Network },
   { href: "/proof", label: "Proof", icon: ShieldCheck },
+  { href: "/proof-inspector", label: "Proof Inspector", icon: BadgeCheck },
   { href: "/studio", label: "Studio", icon: Clapperboard },
   { href: "/allb", label: "ALLB", icon: Wallet },
   { href: "/saptadhatu", label: "Saptadhatu", icon: Sparkles },
