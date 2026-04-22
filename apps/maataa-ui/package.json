@@ -6,6 +6,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "tunnel": "cloudflared tunnel --url http://localhost:3000",
     "tunnel:6789": "cloudflared tunnel --url http://localhost:6789",
     "radio:live": "cloudflared tunnel --url http://localhost:8000",
@@ -19,5 +21,9 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }
