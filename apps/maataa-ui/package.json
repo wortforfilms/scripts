@@ -5,9 +5,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "tunnel": "cloudflared tunnel --url http://localhost:3000",
+    "tunnel:6789": "cloudflared tunnel --url http://localhost:6789",
+    "radio:live": "cloudflared tunnel --url http://localhost:8000",
+    "verify:public": "cloudflared tunnel --url http://localhost:3000"
   },
   "dependencies": {
+    "ethers": "^6.13.4",
     "framer-motion": "^11.3.19",
     "lucide-react": "^0.453.0",
     "next": "^15.2.2",
