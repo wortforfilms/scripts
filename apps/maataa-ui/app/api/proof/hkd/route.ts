@@ -9,9 +9,18 @@ import {
 } from "@/lib/proof";
 
 export async function GET() {
-  const scheduler = getSchedulerState().logs ?? [];
-  const proof = getProofState().logs ?? [];
-  const radio = getRadioState().logs ?? [];
+  const scheduler = (getSchedulerState().logs ?? []).map((event) => ({
+    ...event,
+    proofLabel: "RUNTIME_EVENT"
+  }));
+  const proof = (getProofState().logs ?? []).map((event) => ({
+    ...event,
+    proofLabel: "PROOF_EVENT"
+  }));
+  const radio = (getRadioState().logs ?? []).map((event) => ({
+    ...event,
+    proofLabel: "BROADCAST_PROOF"
+  }));
 
   const timeline = [...scheduler, ...proof, ...radio]
     .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
@@ -21,7 +30,7 @@ export async function GET() {
   const signature = signRoot(root);
 
   const hkd = {
-    version: "0.2.0",
+    version: "0.2.1",
     type: "HKD",
     merkleRoot: root,
     signature,
