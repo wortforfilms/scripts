@@ -23,8 +23,62 @@ export function getIpfsConfig(): IpfsProviderConfig {
   };
 }
 
+async function publishToPinata(merkleRoot: string, config: IpfsProviderConfig): Promise<PreparedIpfsRecord> {
+  if (!config.apiKey || !config.secretApiKey) {
+    return {
+      merkleRoot,
+      cid: `pending-${merkleRoot.slice(0, 24)}`,
+      provider: "pinata",
+      published: false
+    };
+  }
+
+  const payload = {
+    pinataContent: {
+      merkleRoot,
+      exportedAt: new Date().toISOString()
+    },
+    pinataMetadata: {
+      name: `maataa-${merkleRoot.slice(0, 12)}`
+    }
+  };
+
+  const response = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      pinata_api_key: config.apiKey,
+      pinata_secret_api_key: config.secretApiKey
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    return {
+      merkleRoot,
+      cid: `pending-${merkleRoot.slice(0, 24)}`,
+      provider: "pinata",
+      published: false
+    };
+  }
+
+  const data = await response.json();
+
+  return {
+    merkleRoot,
+    cid: data.IpfsHash,
+    provider: "pinata",
+    published: true
+  };
+}
+
 export async function prepareIpfsPublish(merkleRoot: string): Promise<PreparedIpfsRecord> {
   const config = getIpfsConfig();
+
+  if (config.mode === "pinata") {
+    return publishToPinata(merkleRoot, config);
+  }
+
   return {
     merkleRoot,
     cid: `pending-${merkleRoot.slice(0, 24)}`,
