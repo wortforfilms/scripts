@@ -7,5 +7,8 @@
     "build": "turbo run build",
     "start": "turbo run start",
     "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
   }
 }
