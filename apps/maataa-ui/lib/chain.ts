@@ -1,3 +1,5 @@
+import { ethers } from "ethers";
+
 export type ChainProviderConfig = {
   chain: "polygon" | "ethereum" | "base" | "custom";
   rpcUrl?: string;
@@ -21,12 +23,37 @@ export function getChainConfig(): ChainProviderConfig {
   };
 }
 
-export async function prepareChainAnchor(merkleRoot: string): Promise<AnchorTx> {
-  const config = getChainConfig();
+async function executeRealAnchor(merkleRoot: string, config: ChainProviderConfig): Promise<AnchorTx> {
+  if (!config.rpcUrl || !config.privateKey || !config.contractAddress) {
+    return {
+      merkleRoot,
+      txHash: `pending-${merkleRoot.slice(0, 32)}`,
+      chain: config.chain,
+      confirmed: false
+    };
+  }
+
+  const provider = new ethers.JsonRpcProvider(config.rpcUrl);
+  const wallet = new ethers.Wallet(config.privateKey, provider);
+
+  const abi = [
+    "function anchorMerkleRoot(string memory root) public"
+  ];
+
+  const contract = new ethers.Contract(config.contractAddress, abi, wallet);
+
+  const tx = await contract.anchorMerkleRoot(merkleRoot);
+  const receipt = await tx.wait();
+
   return {
     merkleRoot,
-    txHash: `pending-${merkleRoot.slice(0, 32)}`,
+    txHash: receipt.hash,
     chain: config.chain,
-    confirmed: false
+    confirmed: receipt.status === 1
   };
+}
+
+export async function prepareChainAnchor(merkleRoot: string): Promise<AnchorTx> {
+  const config = getChainConfig();
+  return executeRealAnchor(merkleRoot, config);
 }
