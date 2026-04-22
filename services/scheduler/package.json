@@ -1,0 +1,8 @@
+{
+  "name": "@maataa/scheduler",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  }
+}
