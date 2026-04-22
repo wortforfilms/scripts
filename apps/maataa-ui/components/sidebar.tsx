@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BookOpen, Clapperboard, Cpu, Network, Radio, ShieldCheck, Sparkles, Wallet, BadgeCheck } from "lucide-react";
+import { Activity, BookOpen, Clapperboard, Cpu, Network, Radio, ShieldCheck, Sparkles, Wallet, BadgeCheck, Broadcast } from "lucide-react";
 
 const sections = [
   { href: "/dashboard", label: "Dashboard", icon: Activity },
@@ -14,7 +14,8 @@ const sections = [
   { href: "/allb", label: "ALLB", icon: Wallet },
   { href: "/saptadhatu", label: "Saptadhatu", icon: Sparkles },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },
-  { href: "/radio", label: "Radio", icon: Radio }
+  { href: "/radio", label: "Radio", icon: Radio },
+  { href: "/radio-live", label: "Radio Live", icon: Broadcast }
 ];
 
 function cn(...parts: Array<string | false | null | undefined>) {
@@ -29,7 +30,7 @@ export function Sidebar() {
       <div className="border-b border-yellow-500/15 p-6">
         <div className="text-xs uppercase tracking-[0.3em] text-yellow-400/70">Maataa</div>
         <div className="mt-2 text-2xl font-semibold text-white">Living Interface</div>
-        <div className="mt-2 text-sm text-white/55">OS surface for runtime, status, proof, studio, ALLB, and embodiment.</div>
+        <div className="mt-2 text-sm text-white/55">OS surface for runtime, status, proof, studio, ALLB, embodiment, and radio.</div>
       </div>
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-2">
@@ -57,7 +58,7 @@ export function Sidebar() {
       <div className="border-t border-yellow-500/15 p-4">
         <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4">
           <div className="text-sm font-medium text-yellow-300">Offline Sovereign Mode</div>
-          <div className="mt-1 text-xs text-white/60">Proof, status, archive, and runtime active on local stack.</div>
+          <div className="mt-1 text-xs text-white/60">Proof, status, archive, runtime, and radio active on local stack.</div>
         </div>
       </div>
     </aside>
