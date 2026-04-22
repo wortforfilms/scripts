@@ -1,4 +1,11 @@
+import { createSchedulerEmitter } from "../../../../../../services/scheduler/index.js";
+import { createProofEmitter } from "../../../../../../services/proof-worker/index.js";
+import { createRadioEmitter } from "../../../../../../services/playout-worker/index.js";
+
 const encoder = new TextEncoder();
+const scheduler = createSchedulerEmitter();
+const proof = createProofEmitter();
+const radio = createRadioEmitter();
 
 function send(data: unknown) {
   return encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
@@ -8,28 +15,13 @@ export async function GET() {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       const tick = () => {
-        const states = ["ok", "warn", "critical"] as const;
-        const types = [
-          "scheduler.tick",
-          "proof.generated",
-          "render.queued",
-          "wallet.synced",
-          "dhatu.updated",
-          "radio.now_playing"
-        ];
-
-        const event = {
-          id: crypto.randomUUID(),
-          time: new Date().toLocaleTimeString(),
-          type: types[Math.floor(Math.random() * types.length)],
-          state: states[Math.floor(Math.random() * states.length)]
-        };
-
+        const sources = [scheduler, proof, radio];
+        const event = sources[Math.floor(Math.random() * sources.length)]();
         controller.enqueue(send(event));
       };
 
       tick();
-      const interval = setInterval(tick, 2500);
+      const interval = setInterval(tick, 2000);
 
       return () => clearInterval(interval);
     }
