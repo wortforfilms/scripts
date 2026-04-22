@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  icecast:
+    image: moul/icecast
+    ports:
+      - "8000:8000"
+
+  liquidsoap:
+    image: savonet/liquidsoap
+    volumes:
+      - ./liquidsoap:/config
+    depends_on:
+      - icecast
