@@ -1,0 +1,11 @@
+{
+  "name": "maataa-monorepo",
+  "private": true,
+  "packageManager": "pnpm@9",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "typecheck": "turbo run typecheck"
+  }
+}
