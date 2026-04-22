@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import { buildMerkleLeaves, buildMerkleRoot, sha256 } from "@/lib/proof";
 
 type TimelineEvent = {
@@ -10,25 +11,48 @@ type TimelineEvent = {
   time: string;
 };
 
-function buildLayers(leaves: string[]) {
-  if (leaves.length === 0) return [[sha256("")]];
-  const layers: string[][] = [leaves];
-  let current = [...leaves];
+type LayerNode = {
+  hash: string;
+  fromLeafRange: [number, number];
+};
+
+function buildLayerObjects(leaves: string[]) {
+  if (leaves.length === 0) {
+    return [[{ hash: sha256(""), fromLeafRange: [0, 0] as [number, number] }]];
+  }
+
+  let current: LayerNode[] = leaves.map((hash, index) => ({
+    hash,
+    fromLeafRange: [index, index]
+  }));
+
+  const layers: LayerNode[][] = [current];
+
   while (current.length > 1) {
-    const next: string[] = [];
+    const next: LayerNode[] = [];
     for (let i = 0; i < current.length; i += 2) {
       const left = current[i];
-      const right = current[i + 1] ?? left;
-      next.push(sha256(`${left}:${right}`));
+      const right = current[i + 1] ?? current[i];
+      next.push({
+        hash: sha256(`${left.hash}:${right.hash}`),
+        fromLeafRange: [left.fromLeafRange[0], right.fromLeafRange[1]]
+      });
     }
     layers.push(next);
     current = next;
   }
+
   return layers;
+}
+
+function isHighlighted(range: [number, number], selectedIndex: number | null) {
+  if (selectedIndex === null) return false;
+  return selectedIndex >= range[0] && selectedIndex <= range[1];
 }
 
 export default function MerklePage() {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/runtime/timeline")
@@ -37,20 +61,23 @@ export default function MerklePage() {
   }, []);
 
   const leaves = useMemo(() => buildMerkleLeaves(events as Array<Record<string, unknown>>), [events]);
-  const layers = useMemo(() => buildLayers(leaves), [leaves]);
+  const layers = useMemo(() => buildLayerObjects(leaves), [leaves]);
   const root = useMemo(() => buildMerkleRoot(leaves), [leaves]);
 
   return (
     <div className="min-h-screen bg-black p-6 text-white">
       <div className="mx-auto max-w-6xl space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-yellow-300">Merkle Tree Visualizer</h1>
-          <p className="mt-2 text-white/60">Visual view of timeline events compressed into a Merkle root.</p>
+          <h1 className="text-3xl font-bold text-yellow-300">Animated Merkle Tree</h1>
+          <p className="mt-2 text-white/60">Select an event leaf to highlight its proof path through every tree layer up to the root.</p>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
           <div className="text-sm text-white/50">Merkle Root</div>
           <div className="mt-2 break-all font-mono text-sm text-white">{root}</div>
+          <div className="mt-3 text-xs text-yellow-300/80">
+            {selectedIndex !== null ? `Highlighted path for leaf #${selectedIndex}` : "Select a leaf below to animate its proof path."}
+          </div>
         </div>
 
         <div className="space-y-5">
@@ -58,12 +85,31 @@ export default function MerklePage() {
             <div key={idx} className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="mb-3 text-sm font-semibold text-yellow-300">Layer {idx} • {layer.length} node(s)</div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {layer.map((node, nodeIdx) => (
-                  <div key={`${idx}-${nodeIdx}`} className="rounded-xl bg-black/40 p-3">
-                    <div className="text-xs text-white/40">Node {nodeIdx}</div>
-                    <div className="mt-1 break-all font-mono text-xs text-white/85">{node}</div>
-                  </div>
-                ))}
+                {layer.map((node, nodeIdx) => {
+                  const highlighted = isHighlighted(node.fromLeafRange, selectedIndex);
+                  return (
+                    <motion.div
+                      key={`${idx}-${nodeIdx}`}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        scale: highlighted ? 1.03 : 1,
+                        boxShadow: highlighted
+                          ? "0 0 0 1px rgba(250,204,21,0.35), 0 0 24px rgba(250,204,21,0.18)"
+                          : "0 0 0 1px rgba(255,255,255,0.04)"
+                      }}
+                      transition={{ duration: 0.25, delay: idx * 0.04 + nodeIdx * 0.02 }}
+                      className={`rounded-xl p-3 ${highlighted ? "bg-yellow-400/10" : "bg-black/40"}`}
+                    >
+                      <div className="text-xs text-white/40">Node {nodeIdx}</div>
+                      <div className="mt-1 break-all font-mono text-xs text-white/85">{node.hash}</div>
+                      <div className="mt-2 text-[11px] text-yellow-300/80">
+                        Leaves {node.fromLeafRange[0]} → {node.fromLeafRange[1]}
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -72,17 +118,21 @@ export default function MerklePage() {
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
           <div className="mb-3 text-lg font-semibold text-white">Event Leaves</div>
           <div className="space-y-2">
-            {events.map((event, index) => (
-              <a
-                key={event.id}
-                href={`/merkle/event/${event.id}?index=${index}`}
-                className="block rounded-xl border border-white/10 bg-black/40 p-3 hover:border-yellow-400/40 hover:bg-black/50"
-              >
-                <div className="text-sm font-medium text-white">{event.type}</div>
-                <div className="text-xs text-white/50">{event.time} • {event.source ?? "unknown"}</div>
-                <div className="mt-1 font-mono text-xs text-yellow-300/80">{leaves[index]}</div>
-              </a>
-            ))}
+            {events.map((event, index) => {
+              const active = selectedIndex === index;
+              return (
+                <button
+                  key={event.id}
+                  onClick={() => setSelectedIndex(index)}
+                  className={`block w-full rounded-xl border p-3 text-left transition ${active ? "border-yellow-400/50 bg-yellow-400/10" : "border-white/10 bg-black/40 hover:border-yellow-400/40 hover:bg-black/50"}`}
+                >
+                  <div className="text-sm font-medium text-white">{event.type}</div>
+                  <div className="text-xs text-white/50">{event.time} • {event.source ?? "unknown"}</div>
+                  <div className="mt-1 font-mono text-xs text-yellow-300/80">{leaves[index]}</div>
+                  <div className="mt-2 text-[11px] text-white/45">Click to highlight this event’s proof path</div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
