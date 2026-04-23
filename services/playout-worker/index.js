@@ -1,7 +1,8 @@
 const radioState = {
   trackIndex: 0,
   lastEvent: null,
-  logs: []
+  logs: [],
+  queue: []
 };
 
 const radioListeners = new Set();
@@ -41,6 +42,40 @@ export function createRadioEmitter() {
     pushLog(event);
     return event;
   };
+}
+
+export function emitRadioEvent(event) {
+  const normalized = {
+    id: event.id ?? `radio-${Date.now()}`,
+    source: "radio",
+    type: event.type ?? "radio.event",
+    time: event.time ?? new Date().toISOString(),
+    state: event.state ?? "ok",
+    ...event
+  };
+  pushLog(normalized);
+  return normalized;
+}
+
+export function updateNowPlaying(track) {
+  const event = {
+    id: `radio-${Date.now()}`,
+    source: "radio",
+    type: "radio.now_playing",
+    time: new Date().toISOString(),
+    state: "ok",
+    track
+  };
+  pushLog(event);
+  return event;
+}
+
+export function updateRadioQueue(queue) {
+  radioState.queue = queue;
+  emitRadioEvent({
+    type: "radio.queue_updated",
+    queueSize: queue.length
+  });
 }
 
 export function subscribeRadio(listener) {
