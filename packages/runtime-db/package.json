@@ -1,0 +1,9 @@
+{
+  "name": "@maataa/runtime-db",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "dependencies": {
+    "@libsql/client": "^0.15.15"
+  }
+}
