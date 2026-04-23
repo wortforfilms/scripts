@@ -1,3 +1,5 @@
+import { persistRuntimeEvent } from "@maataa/runtime-db";
+
 const radioState = {
   trackIndex: 0,
   lastEvent: null,
@@ -22,10 +24,13 @@ function notify(event) {
   }
 }
 
-function pushLog(event) {
+async function pushLog(event) {
   radioState.logs = [event, ...radioState.logs].slice(0, 50);
   radioState.lastEvent = event;
   notify(event);
+  try {
+    await persistRuntimeEvent(event);
+  } catch {}
 }
 
 export function createRadioEmitter() {
