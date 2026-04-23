@@ -36,6 +36,19 @@ export function createProofEmitter() {
   };
 }
 
+export function emitProofEvent(event) {
+  const normalized = {
+    id: event.id ?? `proof-${Date.now()}`,
+    source: "proof",
+    type: event.type ?? "proof.event",
+    time: event.time ?? new Date().toISOString(),
+    state: event.state ?? "ok",
+    ...event
+  };
+  pushLog(normalized);
+  return normalized;
+}
+
 export function subscribeProof(listener) {
   proofListeners.add(listener);
   return () => proofListeners.delete(listener);
