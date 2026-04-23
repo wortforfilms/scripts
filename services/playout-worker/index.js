@@ -4,6 +4,8 @@ const radioState = {
   logs: []
 };
 
+const radioListeners = new Set();
+
 const tracks = [
   "Om Resonance",
   "Dhatu Flow",
@@ -11,9 +13,18 @@ const tracks = [
   "Anahata Pulse"
 ];
 
+function notify(event) {
+  for (const listener of radioListeners) {
+    try {
+      listener(event);
+    } catch {}
+  }
+}
+
 function pushLog(event) {
   radioState.logs = [event, ...radioState.logs].slice(0, 50);
   radioState.lastEvent = event;
+  notify(event);
 }
 
 export function createRadioEmitter() {
@@ -30,6 +41,11 @@ export function createRadioEmitter() {
     pushLog(event);
     return event;
   };
+}
+
+export function subscribeRadio(listener) {
+  radioListeners.add(listener);
+  return () => radioListeners.delete(listener);
 }
 
 export function getRadioState() {
