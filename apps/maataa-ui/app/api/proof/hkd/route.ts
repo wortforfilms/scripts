@@ -1,5 +1,5 @@
 import { getSchedulerState } from "../../../../../../services/scheduler/index.js";
-import { getProofState } from "../../../../../../services/proof-worker/index.js";
+import { getProofState, emitProofEvent } from "../../../../../../services/proof-worker/index.js";
 import { getRadioState } from "../../../../../../services/playout-worker/index.js";
 import {
   buildMerkleLeaves,
@@ -38,6 +38,13 @@ export async function GET() {
     payload: timeline,
     exportedAt: new Date().toISOString()
   };
+
+  emitProofEvent({
+    type: "proof.generated",
+    state: "ok",
+    merkleRoot: root,
+    payloadSize: timeline.length
+  });
 
   return new Response(JSON.stringify(hkd, null, 2), {
     headers: {
