@@ -14,16 +14,38 @@ function send(data: unknown) {
 export async function GET() {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
+      let closed = false;
+      let interval: ReturnType<typeof setInterval> | undefined;
+
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        if (interval) clearInterval(interval);
+        try {
+          controller.close();
+        } catch {}
+      };
+
       const tick = () => {
-        const sources = [scheduler, proof, radio];
-        const event = sources[Math.floor(Math.random() * sources.length)]();
-        controller.enqueue(send(event));
+        if (closed) return;
+
+        try {
+          const sources = [scheduler, proof, radio];
+          const event = sources[Math.floor(Math.random() * sources.length)]();
+          if (closed) return;
+          controller.enqueue(send(event));
+        } catch {
+          close();
+        }
       };
 
       tick();
-      const interval = setInterval(tick, 2000);
+      interval = setInterval(tick, 2000);
 
-      return () => clearInterval(interval);
+      return close;
+    },
+    cancel() {
+      // start() cleanup handles lifecycle
     }
   });
 
