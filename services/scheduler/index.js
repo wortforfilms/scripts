@@ -17,6 +17,10 @@ function notify(event) {
   }
 }
 
+function newCorrelationId(prefix = "corr") {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 async function pushLog(event) {
   schedulerState.logs = [event, ...schedulerState.logs].slice(0, 50);
   schedulerState.lastEvent = event;
@@ -31,6 +35,8 @@ export function createSchedulerEmitter() {
     schedulerState.ticks += 1;
     const event = {
       id: `scheduler-${schedulerState.ticks}`,
+      correlationId: newCorrelationId("scheduler"),
+      parentEventId: null,
       source: "scheduler",
       type: "scheduler.tick",
       time: new Date().toISOString(),
@@ -46,6 +52,8 @@ export function createSchedulerEmitter() {
 export function emitSchedulerEvent(event) {
   const normalized = {
     id: event.id ?? `scheduler-${Date.now()}`,
+    correlationId: event.correlationId ?? newCorrelationId("scheduler"),
+    parentEventId: event.parentEventId ?? null,
     source: "scheduler",
     type: event.type ?? "scheduler.event",
     time: event.time ?? new Date().toISOString(),
@@ -57,28 +65,34 @@ export function emitSchedulerEvent(event) {
 }
 
 export function queueSchedulerTask(task) {
+  const correlationId = task.correlationId ?? newCorrelationId("task");
   const queued = {
     id: task.id ?? `task-${Date.now()}`,
+    correlationId,
     title: task.title ?? "Untitled Task",
     status: task.status ?? "queued",
     createdAt: new Date().toISOString(),
     ...task
   };
   schedulerState.queue = [queued, ...schedulerState.queue].slice(0, 50);
-  emitSchedulerEvent({
+  const schedulerEvent = emitSchedulerEvent({
     type: "scheduler.queued",
     state: "ok",
+    correlationId,
+    parentEventId: null,
     taskId: queued.id,
     title: queued.title,
     queueSize: schedulerState.queue.length
   });
-  return queued;
+  return { task: queued, event: schedulerEvent };
 }
 
 export function tickScheduler() {
   schedulerState.ticks += 1;
   const event = {
     id: `scheduler-${schedulerState.ticks}`,
+    correlationId: newCorrelationId("scheduler"),
+    parentEventId: null,
     source: "scheduler",
     type: "scheduler.tick",
     time: new Date().toISOString(),
