@@ -24,6 +24,10 @@ function notify(event) {
   }
 }
 
+function newCorrelationId(prefix = "corr") {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 async function pushLog(event) {
   radioState.logs = [event, ...radioState.logs].slice(0, 50);
   radioState.lastEvent = event;
@@ -36,8 +40,11 @@ async function pushLog(event) {
 export function createRadioEmitter() {
   return () => {
     radioState.trackIndex = (radioState.trackIndex + 1) % tracks.length;
+    const correlationId = newCorrelationId("radio");
     const event = {
       id: `radio-${radioState.trackIndex}`,
+      correlationId,
+      parentEventId: null,
       source: "radio",
       type: "radio.now_playing",
       time: new Date().toISOString(),
@@ -52,6 +59,8 @@ export function createRadioEmitter() {
 export function emitRadioEvent(event) {
   const normalized = {
     id: event.id ?? `radio-${Date.now()}`,
+    correlationId: event.correlationId ?? newCorrelationId("radio"),
+    parentEventId: event.parentEventId ?? null,
     source: "radio",
     type: event.type ?? "radio.event",
     time: event.time ?? new Date().toISOString(),
@@ -62,23 +71,29 @@ export function emitRadioEvent(event) {
   return normalized;
 }
 
-export function updateNowPlaying(track) {
+export function updateNowPlaying(track, meta = {}) {
+  const correlationId = meta.correlationId ?? newCorrelationId("radio");
   const event = {
     id: `radio-${Date.now()}`,
+    correlationId,
+    parentEventId: meta.parentEventId ?? null,
     source: "radio",
     type: "radio.now_playing",
     time: new Date().toISOString(),
     state: "ok",
-    track
+    track,
+    ...meta
   };
   pushLog(event);
   return event;
 }
 
-export function updateRadioQueue(queue) {
+export function updateRadioQueue(queue, meta = {}) {
   radioState.queue = queue;
   emitRadioEvent({
     type: "radio.queue_updated",
+    correlationId: meta.correlationId ?? newCorrelationId("radio"),
+    parentEventId: meta.parentEventId ?? null,
     queueSize: queue.length
   });
 }
