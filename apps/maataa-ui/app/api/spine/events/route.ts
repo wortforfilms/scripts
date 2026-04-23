@@ -16,6 +16,8 @@ export async function GET() {
     start(controller) {
       let closed = false;
       let interval: ReturnType<typeof setInterval> | undefined;
+      let sourceIndex = 0;
+      const sources = [scheduler, proof, radio];
 
       const close = () => {
         if (closed) return;
@@ -30,8 +32,8 @@ export async function GET() {
         if (closed) return;
 
         try {
-          const sources = [scheduler, proof, radio];
-          const event = sources[Math.floor(Math.random() * sources.length)]();
+          const event = sources[sourceIndex]();
+          sourceIndex = (sourceIndex + 1) % sources.length;
           if (closed) return;
           controller.enqueue(send(event));
         } catch {
