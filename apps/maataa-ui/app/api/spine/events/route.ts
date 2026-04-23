@@ -1,11 +1,8 @@
-import { createSchedulerEmitter } from "../../../../../../services/scheduler/index.js";
-import { createProofEmitter } from "../../../../../../services/proof-worker/index.js";
-import { createRadioEmitter } from "../../../../../../services/playout-worker/index.js";
+import { subscribeScheduler } from "../../../../../../services/scheduler/index.js";
+import { subscribeProof } from "../../../../../../services/proof-worker/index.js";
+import { subscribeRadio } from "../../../../../../services/playout-worker/index.js";
 
 const encoder = new TextEncoder();
-const scheduler = createSchedulerEmitter();
-const proof = createProofEmitter();
-const radio = createRadioEmitter();
 
 function send(data: unknown) {
   return encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
@@ -15,39 +12,29 @@ export async function GET() {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let closed = false;
-      let interval: ReturnType<typeof setInterval> | undefined;
-      let sourceIndex = 0;
-      const sources = [scheduler, proof, radio];
 
-      const close = () => {
+      const safeEnqueue = (event: unknown) => {
         if (closed) return;
+        try {
+          controller.enqueue(send(event));
+        } catch {
+          closed = true;
+        }
+      };
+
+      const unsubScheduler = subscribeScheduler(safeEnqueue);
+      const unsubProof = subscribeProof(safeEnqueue);
+      const unsubRadio = subscribeRadio(safeEnqueue);
+
+      return () => {
         closed = true;
-        if (interval) clearInterval(interval);
+        unsubScheduler();
+        unsubProof();
+        unsubRadio();
         try {
           controller.close();
         } catch {}
       };
-
-      const tick = () => {
-        if (closed) return;
-
-        try {
-          const event = sources[sourceIndex]();
-          sourceIndex = (sourceIndex + 1) % sources.length;
-          if (closed) return;
-          controller.enqueue(send(event));
-        } catch {
-          close();
-        }
-      };
-
-      tick();
-      interval = setInterval(tick, 2000);
-
-      return close;
-    },
-    cancel() {
-      // start() cleanup handles lifecycle
     }
   });
 
