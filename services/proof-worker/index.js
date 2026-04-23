@@ -1,3 +1,5 @@
+import { persistRuntimeEvent } from "@maataa/runtime-db";
+
 const proofState = {
   batches: 0,
   lastEvent: null,
@@ -14,17 +16,27 @@ function notify(event) {
   }
 }
 
-function pushLog(event) {
+function newCorrelationId(prefix = "corr") {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function pushLog(event) {
   proofState.logs = [event, ...proofState.logs].slice(0, 50);
   proofState.lastEvent = event;
   notify(event);
+  try {
+    await persistRuntimeEvent(event);
+  } catch {}
 }
 
 export function createProofEmitter() {
   return () => {
     proofState.batches += 1;
+    const correlationId = newCorrelationId("proof");
     const event = {
       id: `proof-${proofState.batches}`,
+      correlationId,
+      parentEventId: null,
       source: "proof",
       type: "proof.generated",
       time: new Date().toISOString(),
@@ -39,6 +51,8 @@ export function createProofEmitter() {
 export function emitProofEvent(event) {
   const normalized = {
     id: event.id ?? `proof-${Date.now()}`,
+    correlationId: event.correlationId ?? newCorrelationId("proof"),
+    parentEventId: event.parentEventId ?? null,
     source: "proof",
     type: event.type ?? "proof.event",
     time: event.time ?? new Date().toISOString(),
