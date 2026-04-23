@@ -1,3 +1,5 @@
+import { persistRuntimeEvent } from "@maataa/runtime-db";
+
 const schedulerState = {
   ticks: 0,
   lastEvent: null,
@@ -15,10 +17,13 @@ function notify(event) {
   }
 }
 
-function pushLog(event) {
+async function pushLog(event) {
   schedulerState.logs = [event, ...schedulerState.logs].slice(0, 50);
   schedulerState.lastEvent = event;
   notify(event);
+  try {
+    await persistRuntimeEvent(event);
+  } catch {}
 }
 
 export function createSchedulerEmitter() {
