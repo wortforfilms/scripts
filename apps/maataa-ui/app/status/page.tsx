@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RuntimeEvent } from "@/lib/types";
 import { connectEvents } from "@/lib/events";
+import { RuntimeEventsViewer } from "@/components/runtime-events-viewer";
 
 type NodeState = "ok" | "warn" | "error";
 
@@ -210,6 +211,8 @@ export default function StatusPage() {
             </div>
           </div>
         </div>
+
+        <RuntimeEventsViewer />
       </div>
     </div>
   );
