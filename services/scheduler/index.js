@@ -4,9 +4,20 @@ const schedulerState = {
   logs: []
 };
 
+const schedulerListeners = new Set();
+
+function notify(event) {
+  for (const listener of schedulerListeners) {
+    try {
+      listener(event);
+    } catch {}
+  }
+}
+
 function pushLog(event) {
   schedulerState.logs = [event, ...schedulerState.logs].slice(0, 50);
   schedulerState.lastEvent = event;
+  notify(event);
 }
 
 export function createSchedulerEmitter() {
@@ -23,6 +34,11 @@ export function createSchedulerEmitter() {
     pushLog(event);
     return event;
   };
+}
+
+export function subscribeScheduler(listener) {
+  schedulerListeners.add(listener);
+  return () => schedulerListeners.delete(listener);
 }
 
 export function getSchedulerState() {
