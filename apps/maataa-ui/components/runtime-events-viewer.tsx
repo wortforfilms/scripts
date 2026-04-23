@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 type RuntimeEventRecord = {
   id: string;
+  correlationId?: string | null;
+  parentEventId?: string | null;
   source: string;
   type: string;
   state: string;
@@ -23,19 +25,6 @@ function getEventEpoch(time: string) {
   const fallback = Date.parse(`1970-01-01T${time}`);
   if (!Number.isNaN(fallback)) return fallback;
   return 0;
-}
-
-function findRelatedKey(event: RuntimeEventRecord) {
-  const payload = event.payload ?? {};
-  const candidate =
-    (typeof payload.taskId === "string" && payload.taskId) ||
-    (typeof payload.anchorId === "string" && payload.anchorId) ||
-    (typeof payload.merkleRoot === "string" && payload.merkleRoot) ||
-    (typeof payload.txHash === "string" && payload.txHash) ||
-    (typeof payload.track === "string" && payload.track) ||
-    null;
-
-  return candidate;
 }
 
 export function RuntimeEventsViewer() {
@@ -76,7 +65,7 @@ export function RuntimeEventsViewer() {
 
       if (search.trim()) {
         const q = search.toLowerCase();
-        const haystack = `${event.type} ${event.source} ${event.state} ${event.time}`.toLowerCase();
+        const haystack = `${event.type} ${event.source} ${event.state} ${event.time} ${event.correlationId ?? ""}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
@@ -122,16 +111,33 @@ export function RuntimeEventsViewer() {
   const sources = useMemo(() => Array.from(new Set(events.map((e) => e.source))).sort(), [events]);
   const states = useMemo(() => Array.from(new Set(events.map((e) => e.state))).sort(), [events]);
 
-  const relatedEvents = useMemo(() => {
-    if (!selectedEvent) return [];
-    const relatedKey = findRelatedKey(selectedEvent);
-    if (!relatedKey) return [];
+  const exactChain = useMemo(() => {
+    if (!selectedEvent || !selectedEvent.correlationId) return [];
 
-    return events.filter((event) => {
-      if (event.id === selectedEvent.id) return false;
-      return findRelatedKey(event) === relatedKey;
-    });
+    return events
+      .filter((event) => event.correlationId === selectedEvent.correlationId)
+      .sort((a, b) => getEventEpoch(a.time) - getEventEpoch(b.time));
   }, [selectedEvent, events]);
+
+  const graph = useMemo(() => {
+    const nodes = exactChain.map((event) => ({
+      id: event.id,
+      label: event.type,
+      source: event.source,
+      state: event.state,
+      time: event.time,
+      parentEventId: event.parentEventId ?? null
+    }));
+
+    const edges = exactChain
+      .filter((event) => event.parentEventId)
+      .map((event) => ({
+        from: event.parentEventId as string,
+        to: event.id
+      }));
+
+    return { nodes, edges };
+  }, [exactChain]);
 
   if (loading) {
     return <div className="text-white/60">Loading runtime events...</div>;
@@ -142,7 +148,7 @@ export function RuntimeEventsViewer() {
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-lg font-semibold text-white">Runtime Events</div>
-          <div className="text-sm text-white/50">Persisted libSQL event timeline with filters, search, grouping, time-range slicing, replay, and chain view.</div>
+          <div className="text-sm text-white/50">Persisted libSQL event timeline with filters, search, grouping, time-range slicing, replay, and exact causality graph.</div>
         </div>
         <div className="text-xs text-white/40">{replayItems.length} shown / {events.length} total</div>
       </div>
@@ -151,7 +157,7 @@ export function RuntimeEventsViewer() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search type, source, state..."
+          placeholder="Search type, source, state, correlation..."
           className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30"
         />
 
@@ -220,7 +226,7 @@ export function RuntimeEventsViewer() {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_0.8fr]">
+      <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
         <div className="max-h-[700px] overflow-y-auto space-y-6">
           {grouped.length === 0 || grouped.every((group) => group.items.length === 0) ? (
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/55">
@@ -273,6 +279,8 @@ export function RuntimeEventsViewer() {
                   <div className="text-sm font-medium text-white">{selectedEvent.type}</div>
                   <div className="mt-2 space-y-1 text-xs text-white/55">
                     <div><span className="text-white/35">ID:</span> {selectedEvent.id}</div>
+                    <div><span className="text-white/35">Correlation:</span> {selectedEvent.correlationId ?? "—"}</div>
+                    <div><span className="text-white/35">Parent:</span> {selectedEvent.parentEventId ?? "—"}</div>
                     <div><span className="text-white/35">Source:</span> {selectedEvent.source}</div>
                     <div><span className="text-white/35">State:</span> {selectedEvent.state}</div>
                     <div><span className="text-white/35">Time:</span> {selectedEvent.time}</div>
@@ -281,7 +289,7 @@ export function RuntimeEventsViewer() {
 
                 <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
                   <div className="mb-2 text-sm font-medium text-white">Payload Inspector</div>
-                  <pre className="max-h-[320px] overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-black/50 p-4 text-xs text-cyan-200">
+                  <pre className="max-h-[260px] overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-black/50 p-4 text-xs text-cyan-200">
 {JSON.stringify(selectedEvent.payload ?? selectedEvent, null, 2)}
                   </pre>
                 </div>
@@ -291,36 +299,55 @@ export function RuntimeEventsViewer() {
 
           <div className="rounded-3xl border border-white/10 bg-black/30 p-5 backdrop-blur-xl">
             <div className="mb-4">
-              <div className="text-lg font-semibold text-white">Related Event Chain</div>
-              <div className="text-sm text-white/50">Events linked by shared task, anchor, Merkle root, tx hash, or track.</div>
+              <div className="text-lg font-semibold text-white">Causality Graph</div>
+              <div className="text-sm text-white/50">Exact chain for the selected event based on correlationId and parentEventId.</div>
             </div>
 
             {!selectedEvent ? (
               <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/55">
-                Select an event to explore its related chain.
+                Select an event to visualize its causality chain.
               </div>
-            ) : relatedEvents.length === 0 ? (
+            ) : exactChain.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/55">
-                No linked events found for the selected event.
+                No causal chain found for the selected event.
               </div>
             ) : (
-              <div className="space-y-2 max-h-[320px] overflow-auto">
-                {relatedEvents.map((event) => (
-                  <button
-                    type="button"
-                    key={`${selectedEvent.id}-${event.id}`}
-                    onClick={() => setSelectedEvent(event)}
-                    className="flex w-full items-center justify-between rounded-xl border border-white/5 bg-white/5 px-4 py-3 text-left hover:border-cyan-500/20 hover:bg-white/10"
-                  >
-                    <div>
-                      <div className="text-sm font-medium text-white">{event.type}</div>
-                      <div className="text-xs text-white/40">{event.source} • {event.time}</div>
+              <div className="space-y-3">
+                {graph.nodes.map((node, index) => {
+                  const incoming = graph.edges.find((edge) => edge.to === node.id);
+                  const isSelected = selectedEvent?.id === node.id;
+
+                  return (
+                    <div key={node.id} className="space-y-2">
+                      {index > 0 ? (
+                        <div className="ml-5 h-6 border-l border-cyan-500/30" />
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = exactChain.find((event) => event.id === node.id);
+                          if (next) setSelectedEvent(next);
+                        }}
+                        className={`flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-white/10 bg-white/5 hover:border-cyan-500/20 hover:bg-white/10"}`}
+                      >
+                        <div className="mt-1 h-3 w-3 rounded-full bg-cyan-400" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="text-sm font-medium text-white">{node.label}</div>
+                            <div className={`rounded-full border px-2 py-0.5 text-[10px] ${badge(node.state)}`}>
+                              {node.state}
+                            </div>
+                          </div>
+                          <div className="mt-1 text-xs text-white/40">{node.source} • {node.time}</div>
+                          <div className="mt-1 text-[11px] text-white/35">
+                            parent: {incoming?.from ?? "root"}
+                          </div>
+                        </div>
+                      </button>
                     </div>
-                    <div className={`rounded-full border px-3 py-1 text-xs ${badge(event.state)}`}>
-                      {event.state}
-                    </div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
