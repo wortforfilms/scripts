@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BookOpen, Clapperboard, Cpu, Network, Radio, ShieldCheck, Sparkles, Wallet, BadgeCheck, Broadcast } from "lucide-react";
+import { Activity, BookOpen, Clapperboard, Cpu, Network, Radio, ShieldCheck, Sparkles, Wallet, BadgeCheck } from "lucide-react";
 
 const sections = [
   { href: "/dashboard", label: "Dashboard", icon: Activity },
@@ -15,7 +15,7 @@ const sections = [
   { href: "/saptadhatu", label: "Saptadhatu", icon: Sparkles },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen },
   { href: "/radio", label: "Radio", icon: Radio },
-  { href: "/radio-live", label: "Radio Live", icon: Broadcast }
+  { href: "/radio-live", label: "Radio Live", icon: Radio }
 ];
 
 function cn(...parts: Array<string | false | null | undefined>) {
