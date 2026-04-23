@@ -13,6 +13,10 @@ type RuntimeEventRecord = {
   payload?: Record<string, unknown> | null;
 };
 
+type GraphNode = RuntimeEventRecord & {
+  children: GraphNode[];
+};
+
 function badge(state: string) {
   if (state === "ok") return "bg-emerald-500/10 text-emerald-300 border-emerald-500/20";
   if (state === "warn") return "bg-yellow-500/10 text-yellow-300 border-yellow-500/20";
@@ -25,6 +29,59 @@ function getEventEpoch(time: string) {
   const fallback = Date.parse(`1970-01-01T${time}`);
   if (!Number.isNaN(fallback)) return fallback;
   return 0;
+}
+
+function CausalityTreeNode({
+  node,
+  selectedId,
+  onSelect,
+  depth = 0
+}: {
+  node: GraphNode;
+  selectedId?: string | null;
+  onSelect: (event: RuntimeEventRecord) => void;
+  depth?: number;
+}) {
+  const isSelected = selectedId === node.id;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start gap-3">
+        {depth > 0 ? <div className="mt-0.5 h-6 border-l border-cyan-500/30" /> : <div className="w-[1px]" />}
+        <button
+          type="button"
+          onClick={() => onSelect(node)}
+          className={`flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-white/10 bg-white/5 hover:border-cyan-500/20 hover:bg-white/10"}`}
+        >
+          <div className="mt-1 h-3 w-3 rounded-full bg-cyan-400" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-sm font-medium text-white">{node.type}</div>
+              <div className={`rounded-full border px-2 py-0.5 text-[10px] ${badge(node.state)}`}>
+                {node.state}
+              </div>
+            </div>
+            <div className="mt-1 text-xs text-white/40">{node.source} • {node.time}</div>
+            <div className="mt-1 text-[11px] text-white/35">parent: {node.parentEventId ?? "root"}</div>
+          </div>
+        </button>
+      </div>
+
+      {node.children.length > 0 ? (
+        <div className="ml-6 space-y-3 border-l border-white/10 pl-4">
+          {node.children.map((child) => (
+            <CausalityTreeNode
+              key={child.id}
+              node={child}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function RuntimeEventsViewer() {
@@ -119,24 +176,25 @@ export function RuntimeEventsViewer() {
       .sort((a, b) => getEventEpoch(a.time) - getEventEpoch(b.time));
   }, [selectedEvent, events]);
 
-  const graph = useMemo(() => {
-    const nodes = exactChain.map((event) => ({
-      id: event.id,
-      label: event.type,
-      source: event.source,
-      state: event.state,
-      time: event.time,
-      parentEventId: event.parentEventId ?? null
-    }));
+  const causalityTree = useMemo(() => {
+    if (exactChain.length === 0) return [] as GraphNode[];
 
-    const edges = exactChain
-      .filter((event) => event.parentEventId)
-      .map((event) => ({
-        from: event.parentEventId as string,
-        to: event.id
-      }));
+    const nodeMap = new Map<string, GraphNode>();
+    for (const event of exactChain) {
+      nodeMap.set(event.id, { ...event, children: [] });
+    }
 
-    return { nodes, edges };
+    const roots: GraphNode[] = [];
+
+    for (const node of nodeMap.values()) {
+      if (node.parentEventId && nodeMap.has(node.parentEventId)) {
+        nodeMap.get(node.parentEventId)?.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+
+    return roots;
   }, [exactChain]);
 
   if (loading) {
@@ -148,7 +206,7 @@ export function RuntimeEventsViewer() {
       <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-lg font-semibold text-white">Runtime Events</div>
-          <div className="text-sm text-white/50">Persisted libSQL event timeline with filters, search, grouping, time-range slicing, replay, and exact causality graph.</div>
+          <div className="text-sm text-white/50">Persisted libSQL event timeline with filters, search, grouping, time-range slicing, replay, and branching causality tree.</div>
         </div>
         <div className="text-xs text-white/40">{replayItems.length} shown / {events.length} total</div>
       </div>
@@ -299,55 +357,28 @@ export function RuntimeEventsViewer() {
 
           <div className="rounded-3xl border border-white/10 bg-black/30 p-5 backdrop-blur-xl">
             <div className="mb-4">
-              <div className="text-lg font-semibold text-white">Causality Graph</div>
-              <div className="text-sm text-white/50">Exact chain for the selected event based on correlationId and parentEventId.</div>
+              <div className="text-lg font-semibold text-white">Branching Causality Tree</div>
+              <div className="text-sm text-white/50">Exact causal tree for the selected event based on correlationId and parentEventId.</div>
             </div>
 
             {!selectedEvent ? (
               <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/55">
-                Select an event to visualize its causality chain.
+                Select an event to visualize its causality tree.
               </div>
-            ) : exactChain.length === 0 ? (
+            ) : causalityTree.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/55">
-                No causal chain found for the selected event.
+                No causality tree found for the selected event.
               </div>
             ) : (
-              <div className="space-y-3">
-                {graph.nodes.map((node, index) => {
-                  const incoming = graph.edges.find((edge) => edge.to === node.id);
-                  const isSelected = selectedEvent?.id === node.id;
-
-                  return (
-                    <div key={node.id} className="space-y-2">
-                      {index > 0 ? (
-                        <div className="ml-5 h-6 border-l border-cyan-500/30" />
-                      ) : null}
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = exactChain.find((event) => event.id === node.id);
-                          if (next) setSelectedEvent(next);
-                        }}
-                        className={`flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-white/10 bg-white/5 hover:border-cyan-500/20 hover:bg-white/10"}`}
-                      >
-                        <div className="mt-1 h-3 w-3 rounded-full bg-cyan-400" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="text-sm font-medium text-white">{node.label}</div>
-                            <div className={`rounded-full border px-2 py-0.5 text-[10px] ${badge(node.state)}`}>
-                              {node.state}
-                            </div>
-                          </div>
-                          <div className="mt-1 text-xs text-white/40">{node.source} • {node.time}</div>
-                          <div className="mt-1 text-[11px] text-white/35">
-                            parent: {incoming?.from ?? "root"}
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-                  );
-                })}
+              <div className="space-y-4 max-h-[420px] overflow-auto">
+                {causalityTree.map((root) => (
+                  <CausalityTreeNode
+                    key={root.id}
+                    node={root}
+                    selectedId={selectedEvent?.id}
+                    onSelect={setSelectedEvent}
+                  />
+                ))}
               </div>
             )}
           </div>
