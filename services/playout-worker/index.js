@@ -1,20 +1,44 @@
 import { persistRuntimeEvent } from "@maataa/runtime-db";
 
+const fallbackTracks = [
+  {
+    id: "track-1",
+    title: "Maataa Opening",
+    kind: "song",
+    audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+    durationSec: 300,
+    transition: "cut"
+  },
+  {
+    id: "track-2",
+    title: "Maataa Flow",
+    kind: "song",
+    audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+    durationSec: 300,
+    transition: "cut"
+  },
+  {
+    id: "ad-1",
+    title: "Maataa Sponsor Break",
+    kind: "ad",
+    audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+    durationSec: 30,
+    transition: "cut"
+  }
+];
+
 const radioState = {
-  trackIndex: 0,
+  trackIndex: -1,
+  currentTrackId: null,
+  currentTrack: null,
+  tracksSinceAd: 0,
+  adEveryNTracks: 2,
   lastEvent: null,
   logs: [],
-  queue: []
+  queue: fallbackTracks
 };
 
 const radioListeners = new Set();
-
-const tracks = [
-  "Om Resonance",
-  "Dhatu Flow",
-  "Cosmic Wave",
-  "Anahata Pulse"
-];
 
 function notify(event) {
   for (const listener of radioListeners) {
@@ -37,23 +61,47 @@ async function pushLog(event) {
   } catch {}
 }
 
-export function createRadioEmitter() {
-  return () => {
-    radioState.trackIndex = (radioState.trackIndex + 1) % tracks.length;
-    const correlationId = newCorrelationId("radio");
-    const event = {
-      id: `radio-${radioState.trackIndex}`,
-      correlationId,
-      parentEventId: null,
-      source: "radio",
-      type: "radio.now_playing",
-      time: new Date().toISOString(),
-      state: "ok",
-      track: tracks[radioState.trackIndex]
+function normalizeTrack(track) {
+  if (typeof track === "string") {
+    return {
+      id: track.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || `track-${Date.now()}`,
+      title: track,
+      kind: "song",
+      audioUrl: null,
+      durationSec: 300,
+      transition: "cut"
     };
-    pushLog(event);
-    return event;
+  }
+
+  return {
+    id: track.id ?? `track-${Date.now()}`,
+    title: track.title ?? track.track ?? "Untitled Track",
+    kind: track.kind ?? "song",
+    audioUrl: track.audioUrl ?? null,
+    durationSec: track.durationSec ?? 300,
+    transition: track.transition ?? "cut",
+    ...track
   };
+}
+
+function selectNextTrack() {
+  const queue = radioState.queue.length ? radioState.queue : fallbackTracks;
+  const ads = queue.filter((item) => item.kind === "ad");
+  const songs = queue.filter((item) => item.kind !== "ad");
+
+  if (ads.length && radioState.tracksSinceAd >= radioState.adEveryNTracks) {
+    radioState.tracksSinceAd = 0;
+    return ads[radioState.trackIndex % ads.length] ?? ads[0];
+  }
+
+  const nextSongIndex = songs.length ? (radioState.trackIndex + 1) % songs.length : 0;
+  radioState.trackIndex = nextSongIndex;
+  radioState.tracksSinceAd += 1;
+  return songs[nextSongIndex] ?? queue[0];
+}
+
+export function createRadioEmitter() {
+  return () => scheduleNextRadioItem();
 }
 
 export function emitRadioEvent(event) {
@@ -71,31 +119,47 @@ export function emitRadioEvent(event) {
   return normalized;
 }
 
-export function updateNowPlaying(track, meta = {}) {
-  const correlationId = meta.correlationId ?? newCorrelationId("radio");
-  const event = {
-    id: `radio-${Date.now()}`,
-    correlationId,
-    parentEventId: meta.parentEventId ?? null,
-    source: "radio",
+export function setNowPlaying(track, meta = {}) {
+  const normalizedTrack = normalizeTrack(track);
+  radioState.currentTrackId = normalizedTrack.id;
+  radioState.currentTrack = normalizedTrack;
+
+  return emitRadioEvent({
     type: "radio.now_playing",
-    time: new Date().toISOString(),
     state: "ok",
-    track,
+    correlationId: meta.correlationId ?? newCorrelationId("radio"),
+    parentEventId: meta.parentEventId ?? null,
+    trackId: normalizedTrack.id,
+    track: normalizedTrack.title,
+    audioUrl: normalizedTrack.audioUrl,
+    durationSec: normalizedTrack.durationSec,
+    kind: normalizedTrack.kind,
+    transition: normalizedTrack.transition,
     ...meta
-  };
-  pushLog(event);
-  return event;
+  });
 }
 
-export function updateRadioQueue(queue, meta = {}) {
-  radioState.queue = queue;
-  emitRadioEvent({
+export function updateNowPlaying(track, meta = {}) {
+  return setNowPlaying(track, meta);
+}
+
+export function setRadioQueue(queue, meta = {}) {
+  radioState.queue = queue.map(normalizeTrack);
+  return emitRadioEvent({
     type: "radio.queue_updated",
     correlationId: meta.correlationId ?? newCorrelationId("radio"),
     parentEventId: meta.parentEventId ?? null,
-    queueSize: queue.length
+    queueSize: radioState.queue.length
   });
+}
+
+export function updateRadioQueue(queue, meta = {}) {
+  return setRadioQueue(queue, meta);
+}
+
+export function scheduleNextRadioItem(meta = {}) {
+  const nextTrack = selectNextTrack();
+  return setNowPlaying(nextTrack, meta);
 }
 
 export function subscribeRadio(listener) {
