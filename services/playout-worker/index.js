@@ -40,6 +40,7 @@ const radioState = {
   interruptionsToday: 0,
   maxInterruptionsPerDay: 12,
   lastInterruptionAt: null,
+  llmProvider: process.env.AI_RJ_LLM_URL ? "http" : "template-fallback",
   memory: {
     playedHistory: [],
     listenerMood: "calm",
@@ -196,12 +197,9 @@ function createHemantSamvatAnnouncementTrack() {
   };
 }
 
-function createAiRjTrack(nextTrack = null, options = {}) {
-  const map = getHemantSamvatGhatiMap();
-  const memory = getMemoryContext();
+function fallbackAiRjScript(context) {
+  const { map, memory, nextTrack, mood, reason } = context;
   const nextTitle = nextTrack?.title ?? "the next Maataa transmission";
-  const mood = options.mood ?? memory.listenerMood ?? "steady";
-  const reason = options.reason ?? "scheduled-rj";
   const recentTitle = memory.lastPlayed?.title ?? "the previous sound";
   const scripts = [
     `Namaste. This is Maataa RJ. Listener mood is ${mood}. We just heard ${recentTitle}. In Hemant Samvat day ${map.hemantSamvatDay}, ghati ${map.ghati}, we open the next wave: ${nextTitle}. Vaigyaaniq dhvani, Maataa ke saath.`,
@@ -211,16 +209,63 @@ function createAiRjTrack(nextTrack = null, options = {}) {
   ];
 
   radioState.rjIndex = (radioState.rjIndex + 1) % scripts.length;
-  const text = options.script ?? scripts[radioState.rjIndex];
+  return scripts[radioState.rjIndex];
+}
+
+async function generateAiRjScript(context) {
+  const endpoint = process.env.AI_RJ_LLM_URL;
+  if (!endpoint) {
+    return { text: fallbackAiRjScript(context), provider: "template-fallback" };
+  }
+
+  const prompt = [
+    "You are Maataa RJ, a warm, wise, poetic, futuristic AI radio jockey.",
+    "Generate one short radio announcement under 45 words.",
+    "Use gentle Hinglish with optional Sanskrit transliteration.",
+    "Do not include markdown. Do not mention you are an AI model.",
+    `Mood: ${context.mood}`,
+    `Reason: ${context.reason}`,
+    `Next track: ${context.nextTrack?.title ?? "unknown"}`,
+    `Recent tracks: ${context.memory.recentTitles.join(", ") || "none"}`,
+    `Session theme: ${context.memory.sessionContext.theme}`,
+    `Hemant Samvat day: ${context.map.hemantSamvatDay}, ghati: ${context.map.ghati}, pala: ${context.map.pala}`
+  ].join("\n");
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, context })
+    });
+
+    if (!response.ok) throw new Error(`LLM request failed: ${response.status}`);
+    const data = await response.json();
+    const text = data.text ?? data.script ?? data.response ?? data.message;
+    if (!text) throw new Error("LLM response missing text");
+    return { text: String(text).slice(0, 500), provider: "http-llm" };
+  } catch {
+    return { text: fallbackAiRjScript(context), provider: "template-fallback-after-error" };
+  }
+}
+
+async function createAiRjTrack(nextTrack = null, options = {}) {
+  const map = getHemantSamvatGhatiMap();
+  const memory = getMemoryContext();
+  const mood = options.mood ?? memory.listenerMood ?? "steady";
+  const reason = options.reason ?? "scheduled-rj";
+  const scriptResult = options.script
+    ? { text: options.script, provider: "explicit-script" }
+    : await generateAiRjScript({ map, memory, nextTrack, mood, reason, personality: radioState.personality });
 
   return {
     id: `ai-rj-${Date.now()}`,
     title: options.title ?? "Maataa RJ Announcement",
     kind: "ai-rj",
-    audioUrl: makeTtsUrl(text),
+    audioUrl: makeTtsUrl(scriptResult.text),
     durationSec: options.durationSec ?? 16,
     transition: "cut",
-    ttsText: text,
+    ttsText: scriptResult.text,
+    scriptProvider: scriptResult.provider,
     personality: radioState.personality,
     hemantSamvatGhatiMap: map,
     previewTrack: nextTrack,
@@ -281,7 +326,7 @@ function peekNextSong() {
   return songs[(radioState.songIndex + 1) % songs.length];
 }
 
-function selectProgrammedTrack() {
+async function selectProgrammedTrack() {
   if (radioState.scheduledUnits > 0 && radioState.scheduledUnits % radioState.ttsEveryUnits === 0) {
     return createHemantSamvatAnnouncementTrack();
   }
@@ -309,9 +354,9 @@ function selectProgrammedTrack() {
   return songs[radioState.songIndex];
 }
 
-function selectNextTrack() {
+async function selectNextTrack() {
   radioState.scheduledUnits += 1;
-  const programmedTrack = normalizeTrack(selectProgrammedTrack());
+  const programmedTrack = normalizeTrack(await selectProgrammedTrack());
   const decision = shouldAiRjInterrupt(programmedTrack);
 
   if (decision.interrupt) {
@@ -320,22 +365,22 @@ function selectNextTrack() {
     return createAiRjTrack(programmedTrack, {
       title: "Maataa RJ Intelligent Interruption",
       reason: decision.reason,
-      mood: decision.mood ?? "contextual",
-      script: `Maataa RJ intelligent interruption. Reason: ${decision.reason}. Listener mood: ${getMemoryContext().listenerMood}. Coming next after this: ${programmedTrack.title}. The broadcast will resume automatically.`
+      mood: decision.mood ?? "contextual"
     });
   }
 
   return programmedTrack;
 }
 
-export function previewScheduledItems(count = 30) {
+export async function previewScheduledItems(count = 30) {
   const limit = Math.max(1, Math.min(Number(count) || 30, 200));
   const snapshot = cloneRadioState();
 
   try {
-    return Array.from({ length: limit }).map((_, index) => {
-      const item = normalizeTrack(selectNextTrack());
-      return {
+    const items = [];
+    for (let index = 0; index < limit; index += 1) {
+      const item = normalizeTrack(await selectNextTrack());
+      items.push({
         index: index + 1,
         scheduledUnit: radioState.scheduledUnits,
         id: item.id,
@@ -344,13 +389,15 @@ export function previewScheduledItems(count = 30) {
         durationSec: item.durationSec,
         transition: item.transition,
         ttsText: item.ttsText,
+        scriptProvider: item.scriptProvider,
         hemantSamvatGhatiMap: item.hemantSamvatGhatiMap,
         previewTrack: item.previewTrack,
         memory: item.memory,
         mood: item.mood,
         reason: item.reason
-      };
-    });
+      });
+    }
+    return items;
   } finally {
     restoreRadioState(snapshot);
   }
@@ -393,6 +440,7 @@ export function setNowPlaying(track, meta = {}) {
     kind: normalizedTrack.kind,
     transition: normalizedTrack.transition,
     ttsText: normalizedTrack.ttsText,
+    scriptProvider: normalizedTrack.scriptProvider,
     personality: normalizedTrack.personality,
     hemantSamvatGhatiMap: normalizedTrack.hemantSamvatGhatiMap,
     previewTrack: normalizedTrack.previewTrack,
@@ -460,11 +508,11 @@ export function updateRadioQueue(queue, meta = {}) {
   return setRadioQueue(queue, meta);
 }
 
-export function scheduleNextRadioItem(meta = {}) {
+export async function scheduleNextRadioItem(meta = {}) {
   if (radioState.overrideActive) {
     resumeScheduler({ reason: "auto-resume-after-override" });
   }
-  const nextTrack = selectNextTrack();
+  const nextTrack = await selectNextTrack();
   return setNowPlaying(nextTrack, meta);
 }
 
