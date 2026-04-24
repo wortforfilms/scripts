@@ -1,6 +1,6 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { randomUUID } from "node:crypto";
+import { appendFile, mkdir, readFile } from "fs/promises";
+import { dirname, resolve } from "path";
+import { randomUUID } from "crypto";
 
 const databasePath = resolve(
   process.cwd(),
