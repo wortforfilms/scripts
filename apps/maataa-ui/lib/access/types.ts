@@ -45,6 +45,7 @@ export type AccessViewer = {
   id: string | null;
   role: UserRole;
   plan: UserPlan;
+  permissions: string[];
   isLoggedIn: boolean;
 };
 

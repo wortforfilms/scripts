@@ -1,23 +1,29 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { canAccessFeature } from "./lib/access/can-access";
 import { findRoute } from "./lib/navigation/routes";
-import { viewerFromCookieValues } from "./lib/auth/viewer";
+import { guestViewer, viewerFromCookieValues } from "./lib/auth/viewer";
+import { SESSION_COOKIE_NAME, verifySessionToken } from "./lib/auth/session";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const route = findRoute(request.nextUrl.pathname);
   if (!route) return NextResponse.next();
 
-  const viewer = viewerFromCookieValues({
-    userId: request.cookies.get("maataa_user_id")?.value,
-    role: request.cookies.get("maataa_role")?.value,
-    plan: request.cookies.get("maataa_plan")?.value
-  });
+  const sessionViewer = await verifySessionToken(request.cookies.get(SESSION_COOKIE_NAME)?.value);
+  const viewer =
+    sessionViewer ??
+    (process.env.NODE_ENV !== "production" && process.env.MAATAA_ALLOW_DEV_AUTH_COOKIES === "true"
+      ? viewerFromCookieValues({
+          userId: request.cookies.get("maataa_user_id")?.value,
+          role: request.cookies.get("maataa_role")?.value,
+          plan: request.cookies.get("maataa_plan")?.value
+        })
+      : guestViewer);
   const permissions =
     viewer.role === "ADMIN" || viewer.role === "SUPER_ADMIN"
-      ? ["catalog-admin", "catalog-review"]
+      ? ["catalog-admin", "catalog-review", ...viewer.permissions]
       : viewer.role === "REVIEWER"
-        ? ["catalog-review"]
-        : [];
+        ? ["catalog-review", ...viewer.permissions]
+        : viewer.permissions;
   const decision = canAccessFeature(viewer, route.featureKey, { permissions });
 
   if (decision.allowed) return NextResponse.next();

@@ -13,10 +13,10 @@ export async function FeatureGate({ featureKey, children }: FeatureGateProps) {
   const viewer = await getViewer();
   const permissions =
     viewer.role === "ADMIN" || viewer.role === "SUPER_ADMIN"
-      ? ["catalog-admin", "catalog-review"]
+      ? ["catalog-admin", "catalog-review", ...viewer.permissions]
       : viewer.role === "REVIEWER"
-        ? ["catalog-review"]
-        : [];
+        ? ["catalog-review", ...viewer.permissions]
+        : viewer.permissions;
   const decision = canAccessFeature(viewer, featureKey, { permissions });
 
   if (decision.allowed) return <>{children}</>;

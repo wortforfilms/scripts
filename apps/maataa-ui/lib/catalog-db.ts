@@ -21,6 +21,17 @@ export type CatalogSku = {
   isActive: boolean;
 };
 
+export async function quoteSkus(skuIds: string[]) {
+  const publicSkus = await listSkus(true);
+  const selected = publicSkus.filter((sku) => skuIds.includes(sku.id));
+  if (selected.length !== skuIds.length) throw new Error("Cart contains unpublished or inactive SKUs");
+  return {
+    amountInPaise: selected.reduce((sum, sku) => sum + sku.amountInPaise, 0),
+    currency: selected[0]?.currency ?? "INR",
+    items: selected
+  };
+}
+
 let catalogInitialized = false;
 
 export async function ensureCatalogDb() {
@@ -188,23 +199,20 @@ export async function transitionSku(id: string, action: "submit-review" | "appro
   return updated;
 }
 
-export async function createPendingOrder(input: { userId: string; skuIds: string[] }) {
+export async function createPendingOrder(input: { userId: string; skuIds: string[]; razorpayOrderId?: string }) {
   await ensureCatalogDb();
-  const publicSkus = await listSkus(true);
-  const selected = publicSkus.filter((sku) => input.skuIds.includes(sku.id));
-  if (selected.length !== input.skuIds.length) throw new Error("Cart contains unpublished or inactive SKUs");
-  const amount = selected.reduce((sum, sku) => sum + sku.amountInPaise, 0);
+  const quote = await quoteSkus(input.skuIds);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
-  const razorpayOrderId = `order_test_${id.replaceAll("-", "").slice(0, 18)}`;
+  const razorpayOrderId = input.razorpayOrderId ?? `order_test_${id.replaceAll("-", "").slice(0, 18)}`;
   await runtimeDb.execute({
     sql: `
       INSERT INTO orders (id, user_id, status, amount_in_paise, currency, razorpay_order_id, items_json, created_at, updated_at)
       VALUES (?, ?, 'PENDING_PAYMENT', ?, 'INR', ?, ?, ?, ?)
     `,
-    args: [id, input.userId, amount, razorpayOrderId, JSON.stringify(selected), now, now]
+    args: [id, input.userId, quote.amountInPaise, razorpayOrderId, JSON.stringify(quote.items), now, now]
   });
-  return { id, razorpayOrderId, amountInPaise: amount, currency: "INR", items: selected };
+  return { id, razorpayOrderId, amountInPaise: quote.amountInPaise, currency: quote.currency, items: quote.items };
 }
 
 export async function markOrderPaidFromWebhook(input: {

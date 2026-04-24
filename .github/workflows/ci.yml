@@ -35,6 +35,9 @@ jobs:
       - name: Test maataa-ui
         run: pnpm --filter @maataa/maataa-ui test
 
+      - name: Release checklist CI
+        run: pnpm release:check
+
       - name: Typecheck maataa-ui
         run: pnpm --filter @maataa/maataa-ui typecheck
 

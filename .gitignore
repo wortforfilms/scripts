@@ -4,6 +4,8 @@ dist
 build
 coverage
 apps/maataa-ui/cypress/artifacts/
+apps/maataa-ui/.maataa-data/
+apps/maataa-ui/tsconfig.tsbuildinfo
 .turbo
 .env
 .env.local

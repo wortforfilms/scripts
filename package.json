@@ -6,7 +6,10 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "start": "turbo run start",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "db:migrate": "node scripts/migrate-libsql.mjs",
+    "db:seed:scripts": "node scripts/seed-scripts.mjs",
+    "release:check": "pnpm --filter @maataa/maataa-ui release:check"
   },
   "devDependencies": {
     "turbo": "^2.0.0"

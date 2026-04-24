@@ -48,10 +48,10 @@ export function AppSidebar({ viewer }: AppSidebarProps) {
   const pathname = usePathname();
   const permissions =
     viewer.role === "ADMIN" || viewer.role === "SUPER_ADMIN"
-      ? ["catalog-admin", "catalog-review"]
+      ? ["catalog-admin", "catalog-review", ...viewer.permissions]
       : viewer.role === "REVIEWER"
-        ? ["catalog-review"]
-        : [];
+        ? ["catalog-review", ...viewer.permissions]
+        : viewer.permissions;
 
   return (
     <aside className="min-h-screen w-full border-r border-white/10 bg-black/25 px-4 py-5 md:w-72">

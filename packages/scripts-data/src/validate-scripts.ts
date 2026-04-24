@@ -1,8 +1,10 @@
 import { assertValidScripts } from "./script.schema";
+import { assertDatasetQa } from "./qa";
 import { scriptDatasetStatus, verifiedScriptsSeed } from "./verified-scripts.seed";
 
 export function validateScriptsSeed() {
   assertValidScripts(verifiedScriptsSeed);
+  assertDatasetQa(verifiedScriptsSeed);
   return {
     ok: true,
     dataset: scriptDatasetStatus(),

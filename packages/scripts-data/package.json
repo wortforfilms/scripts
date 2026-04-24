@@ -6,6 +6,7 @@
     ".": "./src/verified-scripts.seed.ts",
     "./schema": "./src/script.schema.ts",
     "./kharosthi-chain": "./src/kharosthi-chain.ts",
+    "./qa": "./src/qa.ts",
     "./validate": "./src/validate-scripts.ts"
   }
 }

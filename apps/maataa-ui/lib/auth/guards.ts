@@ -25,7 +25,8 @@ export async function requireReviewer() {
 
 export async function requireFeature(featureKey: FeatureKey) {
   const viewer = await getViewer();
-  const permissions = viewer.role === "ADMIN" || viewer.role === "SUPER_ADMIN" ? ["catalog-admin", "catalog-review"] : viewer.role === "REVIEWER" ? ["catalog-review"] : [];
+  const rolePermissions = viewer.role === "ADMIN" || viewer.role === "SUPER_ADMIN" ? ["catalog-admin", "catalog-review"] : viewer.role === "REVIEWER" ? ["catalog-review"] : [];
+  const permissions = [...new Set([...viewer.permissions, ...rolePermissions])];
   const decision = canAccessFeature(viewer, featureKey, { permissions });
   if (!decision.allowed) {
     throw new Response(decision.reason === "signin" ? "Authentication required" : "Feature access denied", {

@@ -23,15 +23,16 @@ vi.mock("next/navigation", () => ({
 import { canAccessFeature } from "../lib/access/can-access";
 import type { AccessViewer } from "../lib/access/types";
 import { viewerFromCookieValues } from "../lib/auth/viewer";
+import { createSessionTokenForTests, SESSION_COOKIE_NAME } from "../lib/auth/session";
 import { requireFeature } from "../lib/auth/guards";
 import { AppSidebar } from "../components/layout/AppSidebar";
 import { FeatureGate } from "../components/access/FeatureGate";
 import { middleware } from "../middleware";
 
-const guest: AccessViewer = { id: null, role: "GUEST", plan: "FREE", isLoggedIn: false };
-const freeUser: AccessViewer = { id: "user_1", role: "USER", plan: "FREE", isLoggedIn: true };
-const premiumUser: AccessViewer = { id: "user_2", role: "USER", plan: "PREMIUM", isLoggedIn: true };
-const admin: AccessViewer = { id: "admin_1", role: "ADMIN", plan: "ENTERPRISE", isLoggedIn: true };
+const guest: AccessViewer = { id: null, role: "GUEST", plan: "FREE", permissions: [], isLoggedIn: false };
+const freeUser: AccessViewer = { id: "user_1", role: "USER", plan: "FREE", permissions: [], isLoggedIn: true };
+const premiumUser: AccessViewer = { id: "user_2", role: "USER", plan: "PREMIUM", permissions: [], isLoggedIn: true };
+const admin: AccessViewer = { id: "admin_1", role: "ADMIN", plan: "ENTERPRISE", permissions: ["catalog-admin"], isLoggedIn: true };
 
 describe("access engine", () => {
   it("guest cannot access protected routes", () => {
@@ -56,19 +57,33 @@ describe("viewer cookies", () => {
 });
 
 describe("middleware", () => {
-  it("redirects guests to signin", () => {
-    const response = middleware(new NextRequest("https://scripts.vaigyaaniq.info/dashboard"));
+  it("redirects guests to signin", async () => {
+    const response = await middleware(new NextRequest("https://scripts.vaigyaaniq.info/dashboard"));
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/signin");
   });
 
-  it("redirects logged-in restricted users to upgrade", () => {
+  it("redirects logged-in restricted users to upgrade", async () => {
+    process.env.AUTH_SESSION_SECRET = "test-secret";
+    const token = await createSessionTokenForTests({ sub: "user_1", role: "USER", plan: "FREE" }, "test-secret");
     const request = new NextRequest("https://scripts.vaigyaaniq.info/checkout", {
-      headers: { cookie: "maataa_user_id=user_1; maataa_role=USER; maataa_plan=FREE" }
+      headers: { cookie: `${SESSION_COOKIE_NAME}=${token}` }
     });
-    const response = middleware(request);
+    const response = await middleware(request);
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/upgrade");
+    delete process.env.AUTH_SESSION_SECRET;
+  });
+
+  it("accepts verified production session JWTs", async () => {
+    process.env.AUTH_SESSION_SECRET = "test-secret";
+    const token = await createSessionTokenForTests({ sub: "admin_1", role: "ADMIN", plan: "ENTERPRISE" }, "test-secret");
+    const request = new NextRequest("https://scripts.vaigyaaniq.info/admin/orders", {
+      headers: { cookie: `${SESSION_COOKIE_NAME}=${token}` }
+    });
+    const response = await middleware(request);
+    expect(response.status).toBe(200);
+    delete process.env.AUTH_SESSION_SECRET;
   });
 });
 

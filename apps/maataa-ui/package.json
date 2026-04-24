@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "start-server-and-test \"pnpm dev --hostname 127.0.0.1 --port 3000\" http://127.0.0.1:3000 \"pnpm e2e:warm && pnpm cypress:run\"",
+    "release:check": "node ./scripts/release-check.mjs",
     "test:watch": "vitest",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run --e2e --browser chrome",
