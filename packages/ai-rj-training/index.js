@@ -56,6 +56,8 @@ function toTrainingRecord(event, feedback = { score: 0 }) {
       { role: "user", content: buildUserPrompt(payload) },
       { role: "assistant", content: script }
     ],
+    prompt: buildUserPrompt(payload),
+    completion: script,
     metadata: {
       eventId: event.id ?? payload.id ?? null,
       time: event.time ?? payload.time ?? null,
@@ -73,7 +75,78 @@ function toTrainingRecord(event, feedback = { score: 0 }) {
   };
 }
 
+function collectRatedRecords(events, options = {}) {
+  const includeFallback = Boolean(options.includeFallback ?? true);
+  const feedbackIndex = buildFeedbackIndex(events);
+  const rated = [];
+
+  for (const event of events) {
+    const payload = payloadOf(event);
+    const eventId = event.id ?? payload.id ?? null;
+    const feedback = feedbackIndex.get(eventId);
+    const provider = payload.scriptProvider ?? "unknown";
+    const script = safeString(payload.ttsText);
+
+    if (payload.kind !== "ai-rj") continue;
+    if (!feedback || feedback.score === 0) continue;
+    if (!script) continue;
+    if (!includeFallback && provider !== "http-llm") continue;
+
+    rated.push(toTrainingRecord(event, feedback));
+  }
+
+  return rated;
+}
+
+export function buildAiRjPreferenceDataset(events, options = {}) {
+  const rated = collectRatedRecords(events, options);
+  const chosen = rated.filter((record) => record.metadata.feedbackScore > 0);
+  const rejected = rated.filter((record) => record.metadata.feedbackScore < 0);
+  const pairs = [];
+
+  for (const good of chosen) {
+    const matchingBad = rejected.find((bad) =>
+      bad.metadata.reason === good.metadata.reason ||
+      bad.metadata.mood === good.metadata.mood ||
+      bad.metadata.track === good.metadata.track
+    ) ?? rejected[0];
+
+    if (!matchingBad) continue;
+
+    pairs.push({
+      prompt: good.prompt,
+      chosen: good.completion,
+      rejected: matchingBad.completion,
+      messages: good.messages.slice(0, 2),
+      metadata: {
+        chosenEventId: good.metadata.eventId,
+        rejectedEventId: matchingBad.metadata.eventId,
+        mood: good.metadata.mood,
+        reason: good.metadata.reason,
+        chosenScore: good.metadata.feedbackScore,
+        rejectedScore: matchingBad.metadata.feedbackScore
+      }
+    });
+  }
+
+  return {
+    records: pairs,
+    jsonl: pairs.map((record) => JSON.stringify(record)).join("\n") + (pairs.length ? "\n" : ""),
+    stats: {
+      rated: rated.length,
+      chosen: chosen.length,
+      rejected: rejected.length,
+      pairs: pairs.length
+    }
+  };
+}
+
 export function buildAiRjTrainingDataset(events, options = {}) {
+  const mode = options.mode ?? "sft";
+  if (mode === "preference" || mode === "dpo") {
+    return buildAiRjPreferenceDataset(events, options);
+  }
+
   const maxScriptLength = Number(options.maxScriptLength ?? 500);
   const minScriptLength = Number(options.minScriptLength ?? 12);
   const includeFallback = Boolean(options.includeFallback ?? false);
