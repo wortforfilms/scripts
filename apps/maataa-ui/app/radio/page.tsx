@@ -27,6 +27,17 @@ type RadioEvent = {
   };
 };
 
+type PreviewItem = {
+  index: number;
+  scheduledUnit: number;
+  id: string;
+  title: string;
+  kind: string;
+  durationSec?: number;
+  transition?: string;
+  ttsText?: string;
+};
+
 function stateBadge(connected: boolean) {
   return connected
     ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
@@ -36,12 +47,21 @@ function stateBadge(connected: boolean) {
 function kindBadge(kind?: string) {
   if (kind === "ad") return "border-amber-500/20 bg-amber-500/10 text-amber-300";
   if (kind === "tts") return "border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-300";
+  if (kind === "ai-rj") return "border-violet-500/20 bg-violet-500/10 text-violet-300";
   return "border-cyan-500/20 bg-cyan-500/10 text-cyan-300";
+}
+
+function nodeLabel(kind: string) {
+  if (kind === "ad") return "📢";
+  if (kind === "tts") return "🕉️";
+  if (kind === "ai-rj") return "🎙️";
+  return "🎵";
 }
 
 export default function RadioPage() {
   const [nowPlaying, setNowPlaying] = useState<RadioEvent | null>(null);
   const [recentEvents, setRecentEvents] = useState<RadioEvent[]>([]);
+  const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
   const [sseConnected, setSseConnected] = useState(false);
   const [timerLabel, setTimerLabel] = useState("idle");
   const [autoMode, setAutoMode] = useState(true);
@@ -49,8 +69,15 @@ export default function RadioPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const durationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const loadPreview = async () => {
+    const res = await fetch("/api/radio/preview?count=30");
+    const data = await res.json();
+    setPreviewItems(data.items || []);
+  };
+
   const triggerNext = async () => {
     await fetch("/api/radio/next", { method: "POST" }).catch(() => {});
+    loadPreview().catch(() => {});
   };
 
   const playEvent = (event: RadioEvent) => {
@@ -89,6 +116,7 @@ export default function RadioPage() {
       } catch {}
     });
 
+    loadPreview().catch(() => {});
     triggerNext();
 
     return () => {
@@ -114,7 +142,7 @@ export default function RadioPage() {
             <div className="text-xs uppercase tracking-[0.35em] text-yellow-300/70">Vaigyaaniq Broadcast Spine</div>
             <h1 className="mt-2 text-4xl font-bold">📻 Maataa Radio</h1>
             <p className="mt-2 max-w-2xl text-white/60">
-              Scheduler-driven autonomous radio with ads, Hemant Samvat TTS announcements, causality IDs, and duration-based auto-next.
+              Scheduler-driven autonomous radio with ads, AI RJ, Hemant Samvat TTS announcements, preview graph, and duration-based auto-next.
             </p>
           </div>
 
@@ -177,20 +205,9 @@ export default function RadioPage() {
             </div>
 
             <div className="mt-5 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={triggerNext}
-                className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-5 py-3 text-sm font-medium text-cyan-300 hover:bg-cyan-500/15"
-              >
-                Trigger Next
-              </button>
-              <button
-                type="button"
-                onClick={() => audioRef.current?.play().catch(() => {})}
-                className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white/70 hover:bg-white/10"
-              >
-                Resume Audio
-              </button>
+              <button type="button" onClick={triggerNext} className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-5 py-3 text-sm font-medium text-cyan-300 hover:bg-cyan-500/15">Trigger Next</button>
+              <button type="button" onClick={loadPreview} className="rounded-2xl border border-violet-500/20 bg-violet-500/10 px-5 py-3 text-sm text-violet-300 hover:bg-violet-500/15">Refresh Preview</button>
+              <button type="button" onClick={() => audioRef.current?.play().catch(() => {})} className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white/70 hover:bg-white/10">Resume Audio</button>
             </div>
           </div>
 
@@ -210,14 +227,10 @@ export default function RadioPage() {
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <div className="text-lg font-semibold">Scheduler Rules</div>
-                  <div className="text-sm text-white/45">Autonomous programming logic</div>
-                </div>
-              </div>
-              <div className="space-y-2 text-sm">
+              <div className="text-lg font-semibold">Scheduler Rules</div>
+              <div className="mt-3 space-y-2 text-sm">
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-3">🎵 2 songs → 📢 1 ad</div>
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-3">🎙️ AI RJ every 4 scheduled units</div>
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-3">🕉️ TTS every 24 scheduled units</div>
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-3">⏱️ durationSec timer triggers auto-next</div>
               </div>
@@ -237,19 +250,32 @@ export default function RadioPage() {
         <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <div className="text-lg font-semibold">Recent Runtime Radio Events</div>
-              <div className="text-sm text-white/45">Latest now-playing decisions received from SSE</div>
+              <div className="text-lg font-semibold">Visual Scheduler Preview</div>
+              <div className="text-sm text-white/45">Next 30 non-mutating scheduled items from /api/radio/preview</div>
             </div>
           </div>
+          <div className="overflow-x-auto pb-2">
+            <div className="flex min-w-max items-start gap-3">
+              {previewItems.map((item) => (
+                <div key={`${item.index}-${item.id}`} className="flex items-center gap-3">
+                  <div className={`w-44 rounded-2xl border p-4 ${kindBadge(item.kind)}`}>
+                    <div className="text-2xl">{nodeLabel(item.kind)}</div>
+                    <div className="mt-2 text-xs uppercase tracking-wide opacity-75">#{item.index} • unit {item.scheduledUnit}</div>
+                    <div className="mt-1 truncate text-sm font-semibold text-white">{item.title}</div>
+                    <div className="mt-1 text-xs opacity-75">{item.kind} • {item.durationSec}s</div>
+                  </div>
+                  {item.index < previewItems.length ? <div className="h-px w-8 bg-white/20" /> : null}
+                </div>
+              ))}
+              {!previewItems.length ? <div className="text-sm text-white/45">Preview loading...</div> : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+          <div className="mb-4 flex items-center justify-between"><div><div className="text-lg font-semibold">Recent Runtime Radio Events</div><div className="text-sm text-white/45">Latest now-playing decisions received from SSE</div></div></div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {recentEvents.length ? recentEvents.map((event) => (
-              <div key={event.id ?? `${event.track}-${event.time}`} className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                <div className="text-sm font-medium">{event.track}</div>
-                <div className="mt-1 text-xs text-white/45">{event.kind} • {event.durationSec}s</div>
-              </div>
-            )) : (
-              <div className="text-sm text-white/45">Waiting for radio.now_playing events...</div>
-            )}
+            {recentEvents.length ? recentEvents.map((event) => (<div key={event.id ?? `${event.track}-${event.time}`} className="rounded-2xl border border-white/10 bg-black/30 p-4"><div className="text-sm font-medium">{event.track}</div><div className="mt-1 text-xs text-white/45">{event.kind} • {event.durationSec}s</div></div>)) : (<div className="text-sm text-white/45">Waiting for radio.now_playing events...</div>)}
           </div>
         </div>
       </div>
