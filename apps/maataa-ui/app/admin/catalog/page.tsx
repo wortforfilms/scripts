@@ -1,5 +1,6 @@
 import { listSkus } from "../../../lib/catalog-db";
 import { scriptDatasetStatus, verifiedScriptsSeed } from "../../../lib/script-data";
+import { GenerateSkuForm } from "../../../components/admin/GenerateSkuForm";
 
 export const metadata = { title: "Admin Catalog | Maataa Scripts" };
 
@@ -23,6 +24,7 @@ export default async function AdminCatalogPage() {
           <p className="text-sm text-amber-50">{dataset.note}</p>
         </div>
       </section>
+      <GenerateSkuForm />
       <h2 className="mt-10 text-xl font-semibold">Verified Seed Subset</h2>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {verifiedScriptsSeed.map((script) => (

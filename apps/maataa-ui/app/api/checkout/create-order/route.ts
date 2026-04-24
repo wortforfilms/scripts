@@ -1,22 +1,22 @@
 import { NextResponse } from "next/server";
 import { requireFeature, requireUser, routeError } from "../../../../lib/auth";
 import { createPendingOrder, quoteSkus } from "../../../../lib/catalog-db";
+import { parseCheckoutRequest } from "../../../../lib/forms/schemas";
 import { createRazorpayTestOrder } from "../../../../lib/razorpay";
 
 export async function POST(request: Request) {
   try {
     await requireFeature("checkout");
     const user = await requireUser();
-    const body = (await request.json()) as { skuIds?: string[]; acceptedLegal?: boolean };
-    if (!body.acceptedLegal) throw new Error("Terms, Refund Policy, and Digital License must be accepted");
-    if (!Array.isArray(body.skuIds) || body.skuIds.length === 0) throw new Error("Cart is empty");
-    const quote = await quoteSkus(body.skuIds);
+    const parsed = parseCheckoutRequest(await request.json());
+    if (!parsed.ok) throw new Error(parsed.error);
+    const quote = await quoteSkus(parsed.value.skuIds);
     const razorpayOrder = await createRazorpayTestOrder({
       amountInPaise: quote.amountInPaise,
       currency: quote.currency,
       receipt: `maataa_${crypto.randomUUID().slice(0, 18)}`
     });
-    const order = await createPendingOrder({ userId: user.id, skuIds: body.skuIds, razorpayOrderId: razorpayOrder.id });
+    const order = await createPendingOrder({ userId: user.id, skuIds: parsed.value.skuIds, razorpayOrderId: razorpayOrder.id });
     return NextResponse.json({
       order,
       razorpay: {
