@@ -40,6 +40,15 @@ const radioState = {
   interruptionsToday: 0,
   maxInterruptionsPerDay: 12,
   lastInterruptionAt: null,
+  memory: {
+    playedHistory: [],
+    listenerMood: "calm",
+    sessionContext: {
+      startedAt: new Date().toISOString(),
+      theme: "Vaigyaaniq dhvani",
+      notes: []
+    }
+  },
   tracksSinceAd: 0,
   adEveryNTracks: 2,
   scheduledUnits: 0,
@@ -77,7 +86,10 @@ function cloneRadioState() {
     adIndex: radioState.adIndex,
     rjIndex: radioState.rjIndex,
     tracksSinceAd: radioState.tracksSinceAd,
-    scheduledUnits: radioState.scheduledUnits
+    scheduledUnits: radioState.scheduledUnits,
+    interruptionsToday: radioState.interruptionsToday,
+    lastInterruptionAt: radioState.lastInterruptionAt,
+    memory: JSON.parse(JSON.stringify(radioState.memory))
   };
 }
 
@@ -88,6 +100,62 @@ function restoreRadioState(snapshot) {
   radioState.rjIndex = snapshot.rjIndex;
   radioState.tracksSinceAd = snapshot.tracksSinceAd;
   radioState.scheduledUnits = snapshot.scheduledUnits;
+  radioState.interruptionsToday = snapshot.interruptionsToday;
+  radioState.lastInterruptionAt = snapshot.lastInterruptionAt;
+  radioState.memory = snapshot.memory;
+}
+
+function updateListenerMood(track) {
+  if (track.kind === "ad") return "commercial";
+  if (track.kind === "ai-rj") return "guided";
+  if (track.kind === "tts") return "reflective";
+  if (track.title?.toLowerCase().includes("flow")) return "flowing";
+  if (track.title?.toLowerCase().includes("opening")) return "fresh";
+  return radioState.memory.listenerMood ?? "calm";
+}
+
+function rememberPlayedTrack(track, meta = {}) {
+  const memoryItem = {
+    id: track.id,
+    title: track.title,
+    kind: track.kind,
+    time: new Date().toISOString(),
+    scheduledUnit: radioState.scheduledUnits,
+    mood: updateListenerMood(track),
+    reason: meta.reason ?? track.reason ?? null
+  };
+
+  radioState.memory.playedHistory = [memoryItem, ...radioState.memory.playedHistory].slice(0, 24);
+  radioState.memory.listenerMood = memoryItem.mood;
+}
+
+function getMemoryContext() {
+  const recent = radioState.memory.playedHistory.slice(0, 5);
+  return {
+    listenerMood: radioState.memory.listenerMood,
+    sessionContext: radioState.memory.sessionContext,
+    recent,
+    lastPlayed: recent[0] ?? null,
+    recentKinds: recent.map((item) => item.kind),
+    recentTitles: recent.map((item) => item.title)
+  };
+}
+
+export function updateListenerContext(context = {}) {
+  if (context.listenerMood) radioState.memory.listenerMood = context.listenerMood;
+  if (context.note) {
+    radioState.memory.sessionContext.notes = [
+      { text: context.note, time: new Date().toISOString() },
+      ...radioState.memory.sessionContext.notes
+    ].slice(0, 20);
+  }
+  if (context.theme) radioState.memory.sessionContext.theme = context.theme;
+
+  return emitRadioEvent({
+    type: "radio.listener_context_updated",
+    state: "ok",
+    memory: getMemoryContext()
+  });
 }
 
 function getHemantSamvatGhatiMap(date = new Date()) {
@@ -130,14 +198,16 @@ function createHemantSamvatAnnouncementTrack() {
 
 function createAiRjTrack(nextTrack = null, options = {}) {
   const map = getHemantSamvatGhatiMap();
+  const memory = getMemoryContext();
   const nextTitle = nextTrack?.title ?? "the next Maataa transmission";
-  const mood = options.mood ?? "steady";
+  const mood = options.mood ?? memory.listenerMood ?? "steady";
   const reason = options.reason ?? "scheduled-rj";
+  const recentTitle = memory.lastPlayed?.title ?? "the previous sound";
   const scripts = [
-    `Namaste. This is Maataa RJ. In Hemant Samvat day ${map.hemantSamvatDay}, ghati ${map.ghati}, we open the next wave: ${nextTitle}. Vaigyaaniq dhvani, Maataa ke saath.`,
-    `Dear listener, Maataa is aligning scheduler, proof, and radio. Coming next: ${nextTitle}. Shuddh, saarthak, vaigyaaniq pravah.`,
-    `Suno. The runtime is awake, the signal is clean, and the next sound is ${nextTitle}. Maataa RJ is with you.`,
-    `Intelligent interruption. Maataa RJ is briefly entering the stream because ${reason}. After this, the scheduler will resume cleanly.`
+    `Namaste. This is Maataa RJ. Listener mood is ${mood}. We just heard ${recentTitle}. In Hemant Samvat day ${map.hemantSamvatDay}, ghati ${map.ghati}, we open the next wave: ${nextTitle}. Vaigyaaniq dhvani, Maataa ke saath.`,
+    `Dear listener, Maataa remembers the flow: ${memory.recentTitles.join(", ") || "a fresh beginning"}. Coming next: ${nextTitle}. Shuddh, saarthak, vaigyaaniq pravah.`,
+    `Suno. The session theme is ${memory.sessionContext.theme}. The runtime is awake, the signal is clean, and the next sound is ${nextTitle}. Maataa RJ is with you.`,
+    `Intelligent interruption. Maataa RJ is briefly entering the stream because ${reason}. Mood is ${mood}. After this, the scheduler will resume cleanly with ${nextTitle}.`
   ];
 
   radioState.rjIndex = (radioState.rjIndex + 1) % scripts.length;
@@ -154,18 +224,21 @@ function createAiRjTrack(nextTrack = null, options = {}) {
     personality: radioState.personality,
     hemantSamvatGhatiMap: map,
     previewTrack: nextTrack,
+    memory,
     mood,
     reason
   };
 }
 
 function shouldAiRjInterrupt(nextTrack) {
+  const memory = getMemoryContext();
   if (!radioState.intelligentInterruptions) return { interrupt: false, reason: "disabled" };
   if (radioState.overrideActive) return { interrupt: false, reason: "override-active" };
   if (radioState.interruptionsToday >= radioState.maxInterruptionsPerDay) return { interrupt: false, reason: "daily-limit" };
   if (nextTrack?.kind === "ad") return { interrupt: true, reason: "sponsor-break-context", mood: "commercial" };
+  if (memory.recentKinds.slice(0, 3).every((kind) => kind === "song") && memory.recentKinds.length >= 3) return { interrupt: true, reason: "three-song-memory-reset", mood: "guided" };
+  if (memory.listenerMood === "commercial" && nextTrack?.kind === "song") return { interrupt: true, reason: "post-ad-rejoin", mood: "welcoming" };
   if (radioState.scheduledUnits > 0 && radioState.scheduledUnits % 6 === 0) return { interrupt: true, reason: "six-unit-context-reset", mood: "reflective" };
-  if (radioState.tracksSinceAd === 0 && nextTrack?.kind === "song") return { interrupt: true, reason: "post-ad-rejoin", mood: "welcoming" };
   return { interrupt: false, reason: "no-interruption-needed" };
 }
 
@@ -248,7 +321,7 @@ function selectNextTrack() {
       title: "Maataa RJ Intelligent Interruption",
       reason: decision.reason,
       mood: decision.mood ?? "contextual",
-      script: `Maataa RJ intelligent interruption. Reason: ${decision.reason}. Coming next after this: ${programmedTrack.title}. The broadcast will resume automatically.`
+      script: `Maataa RJ intelligent interruption. Reason: ${decision.reason}. Listener mood: ${getMemoryContext().listenerMood}. Coming next after this: ${programmedTrack.title}. The broadcast will resume automatically.`
     });
   }
 
@@ -273,6 +346,7 @@ export function previewScheduledItems(count = 30) {
         ttsText: item.ttsText,
         hemantSamvatGhatiMap: item.hemantSamvatGhatiMap,
         previewTrack: item.previewTrack,
+        memory: item.memory,
         mood: item.mood,
         reason: item.reason
       };
@@ -303,6 +377,7 @@ export function emitRadioEvent(event) {
 
 export function setNowPlaying(track, meta = {}) {
   const normalizedTrack = normalizeTrack(track);
+  rememberPlayedTrack(normalizedTrack, meta);
   radioState.currentTrackId = normalizedTrack.id;
   radioState.currentTrack = normalizedTrack;
 
@@ -321,7 +396,8 @@ export function setNowPlaying(track, meta = {}) {
     personality: normalizedTrack.personality,
     hemantSamvatGhatiMap: normalizedTrack.hemantSamvatGhatiMap,
     previewTrack: normalizedTrack.previewTrack,
-    mood: normalizedTrack.mood,
+    memory: getMemoryContext(),
+    mood: normalizedTrack.mood ?? radioState.memory.listenerMood,
     reason: normalizedTrack.reason,
     ...meta
   });
@@ -354,6 +430,7 @@ export function resumeScheduler(meta = {}) {
     parentEventId: meta.parentEventId ?? null,
     wasOverride,
     overrideTrack,
+    memory: getMemoryContext(),
     nextPreview: peekNextSong()
   });
 }
@@ -374,7 +451,8 @@ export function setRadioQueue(queue, meta = {}) {
     type: "radio.queue_updated",
     correlationId: meta.correlationId ?? newCorrelationId("radio"),
     parentEventId: meta.parentEventId ?? null,
-    queueSize: radioState.queue.length
+    queueSize: radioState.queue.length,
+    memory: getMemoryContext()
   });
 }
 
