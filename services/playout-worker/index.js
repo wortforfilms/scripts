@@ -41,6 +41,14 @@ const radioState = {
   maxInterruptionsPerDay: 12,
   lastInterruptionAt: null,
   llmProvider: process.env.AI_RJ_LLM_URL ? "http" : "template-fallback",
+  onlinePolicy: {
+    enabled: true,
+    explorationRate: 0.15,
+    interruptionBias: 0,
+    phraseBias: {},
+    reasonBias: {},
+    moodBias: {}
+  },
   learning: {
     scriptKnowledge: [],
     preferredPhrases: [],
@@ -93,6 +101,36 @@ function bumpCounter(map, key) {
   map[safeKey] = (map[safeKey] ?? 0) + 1;
 }
 
+function bumpBias(map, key, delta) {
+  const safeKey = key ?? "unknown";
+  map[safeKey] = Number(((map[safeKey] ?? 0) + delta).toFixed(3));
+}
+
+export function applyOnlineFeedback({ targetEventId, score = 0, reason = "feedback", phrase = null, mood = null }) {
+  const delta = Math.max(-1, Math.min(1, Number(score) || 0)) * 0.1;
+  if (!radioState.onlinePolicy.enabled) return radioState.onlinePolicy;
+
+  radioState.onlinePolicy.interruptionBias = Number((radioState.onlinePolicy.interruptionBias + delta).toFixed(3));
+  bumpBias(radioState.onlinePolicy.reasonBias, reason, delta);
+  if (mood) bumpBias(radioState.onlinePolicy.moodBias, mood, delta);
+  if (phrase) {
+    bumpBias(radioState.onlinePolicy.phraseBias, phrase, delta);
+    if (score > 0 && !radioState.learning.preferredPhrases.includes(phrase)) radioState.learning.preferredPhrases.push(phrase);
+    if (score < 0 && !radioState.learning.avoidPhrases.includes(phrase)) radioState.learning.avoidPhrases.push(phrase);
+  }
+
+  return emitRadioEvent({
+    type: "radio.online_policy_updated",
+    state: "ok",
+    targetEventId,
+    score,
+    reason,
+    phrase,
+    mood,
+    onlinePolicy: radioState.onlinePolicy
+  });
+}
+
 function cloneRadioState() {
   return {
     trackIndex: radioState.trackIndex,
@@ -104,7 +142,8 @@ function cloneRadioState() {
     interruptionsToday: radioState.interruptionsToday,
     lastInterruptionAt: radioState.lastInterruptionAt,
     memory: JSON.parse(JSON.stringify(radioState.memory)),
-    learning: JSON.parse(JSON.stringify(radioState.learning))
+    learning: JSON.parse(JSON.stringify(radioState.learning)),
+    onlinePolicy: JSON.parse(JSON.stringify(radioState.onlinePolicy))
   };
 }
 
@@ -119,6 +158,7 @@ function restoreRadioState(snapshot) {
   radioState.lastInterruptionAt = snapshot.lastInterruptionAt;
   radioState.memory = snapshot.memory;
   radioState.learning = snapshot.learning;
+  radioState.onlinePolicy = snapshot.onlinePolicy;
 }
 
 function updateListenerMood(track) {
@@ -184,7 +224,8 @@ function getLearningContext() {
     avoidPhrases: radioState.learning.avoidPhrases.slice(0, 8),
     providerStats: radioState.learning.providerStats,
     reasonStats: radioState.learning.reasonStats,
-    moodStats: radioState.learning.moodStats
+    moodStats: radioState.learning.moodStats,
+    onlinePolicy: radioState.onlinePolicy
   };
 }
 
@@ -260,16 +301,17 @@ function fallbackAiRjScript(context) {
   const { map, memory, learning, nextTrack, mood, reason } = context;
   const nextTitle = nextTrack?.title ?? "the next Maataa transmission";
   const recentTitle = memory.lastPlayed?.title ?? "the previous sound";
-  const rememberedPhrase = learning.preferredPhrases[0] ?? "Vaigyaaniq dhvani";
+  const preferred = learning.preferredPhrases.filter((phrase) => !learning.avoidPhrases.includes(phrase));
+  const rememberedPhrase = preferred[0] ?? "Vaigyaaniq dhvani";
   const scripts = [
     `Namaste. This is Maataa RJ. Listener mood is ${mood}. We just heard ${recentTitle}. In Hemant Samvat day ${map.hemantSamvatDay}, ghati ${map.ghati}, we open the next wave: ${nextTitle}. ${rememberedPhrase}, Maataa ke saath.`,
     `Dear listener, Maataa remembers the flow: ${memory.recentTitles.join(", ") || "a fresh beginning"}. Coming next: ${nextTitle}. Shuddh, saarthak, ${rememberedPhrase}.`,
     `Suno. The session theme is ${memory.sessionContext.theme}. The runtime is awake, the signal is clean, and the next sound is ${nextTitle}. Maataa RJ is with you.`,
     `Intelligent interruption. Maataa RJ is briefly entering the stream because ${reason}. Mood is ${mood}. After this, the scheduler will resume cleanly with ${nextTitle}.`
-  ];
+  ].filter((script) => !learning.avoidPhrases.some((phrase) => script.includes(phrase)));
 
-  radioState.rjIndex = (radioState.rjIndex + 1) % scripts.length;
-  return scripts[radioState.rjIndex];
+  radioState.rjIndex = (radioState.rjIndex + 1) % Math.max(1, scripts.length);
+  return scripts[radioState.rjIndex] ?? `Maataa RJ: Coming next is ${nextTitle}.`;
 }
 
 async function generateAiRjScript(context) {
@@ -283,6 +325,7 @@ async function generateAiRjScript(context) {
     "Generate one short radio announcement under 45 words.",
     "Use gentle Hinglish with optional Sanskrit transliteration.",
     "Use learning from past scripts but avoid exact repetition.",
+    "Respect online policy: prefer positively reinforced phrases and avoid negatively reinforced phrases.",
     "Do not include markdown. Do not mention you are an AI model.",
     `Mood: ${context.mood}`,
     `Reason: ${context.reason}`,
@@ -290,6 +333,8 @@ async function generateAiRjScript(context) {
     `Recent tracks: ${context.memory.recentTitles.join(", ") || "none"}`,
     `Recent scripts: ${context.learning.recentScripts.map((item) => item.text).join(" | ") || "none"}`,
     `Preferred phrases: ${context.learning.preferredPhrases.join(", ") || "none"}`,
+    `Avoid phrases: ${context.learning.avoidPhrases.join(", ") || "none"}`,
+    `Online policy: ${JSON.stringify(context.learning.onlinePolicy)}`,
     `Session theme: ${context.memory.sessionContext.theme}`,
     `Hemant Samvat day: ${context.map.hemantSamvatDay}, ghati: ${context.map.ghati}, pala: ${context.map.pala}`
   ].join("\n");
@@ -342,13 +387,15 @@ async function createAiRjTrack(nextTrack = null, options = {}) {
 
 function shouldAiRjInterrupt(nextTrack) {
   const memory = getMemoryContext();
+  const policyBoost = radioState.onlinePolicy.enabled ? radioState.onlinePolicy.interruptionBias : 0;
+  const reasonBoost = radioState.onlinePolicy.reasonBias[nextTrack?.kind === "ad" ? "sponsor-break-context" : "unknown"] ?? 0;
   if (!radioState.intelligentInterruptions) return { interrupt: false, reason: "disabled" };
   if (radioState.overrideActive) return { interrupt: false, reason: "override-active" };
   if (radioState.interruptionsToday >= radioState.maxInterruptionsPerDay) return { interrupt: false, reason: "daily-limit" };
-  if (nextTrack?.kind === "ad") return { interrupt: true, reason: "sponsor-break-context", mood: "commercial" };
-  if (memory.recentKinds.slice(0, 3).every((kind) => kind === "song") && memory.recentKinds.length >= 3) return { interrupt: true, reason: "three-song-memory-reset", mood: "guided" };
-  if (memory.listenerMood === "commercial" && nextTrack?.kind === "song") return { interrupt: true, reason: "post-ad-rejoin", mood: "welcoming" };
-  if (radioState.scheduledUnits > 0 && radioState.scheduledUnits % 6 === 0) return { interrupt: true, reason: "six-unit-context-reset", mood: "reflective" };
+  if (nextTrack?.kind === "ad" && policyBoost + reasonBoost > -0.3) return { interrupt: true, reason: "sponsor-break-context", mood: "commercial" };
+  if (memory.recentKinds.slice(0, 3).every((kind) => kind === "song") && memory.recentKinds.length >= 3 && policyBoost > -0.5) return { interrupt: true, reason: "three-song-memory-reset", mood: "guided" };
+  if (memory.listenerMood === "commercial" && nextTrack?.kind === "song" && policyBoost > -0.5) return { interrupt: true, reason: "post-ad-rejoin", mood: "welcoming" };
+  if (radioState.scheduledUnits > 0 && radioState.scheduledUnits % 6 === 0 && policyBoost > -0.5) return { interrupt: true, reason: "six-unit-context-reset", mood: "reflective" };
   return { interrupt: false, reason: "no-interruption-needed" };
 }
 
