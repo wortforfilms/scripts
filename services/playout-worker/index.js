@@ -36,6 +36,10 @@ const radioState = {
   currentTrack: null,
   overrideActive: false,
   lastOverrideTrack: null,
+  intelligentInterruptions: true,
+  interruptionsToday: 0,
+  maxInterruptionsPerDay: 12,
+  lastInterruptionAt: null,
   tracksSinceAd: 0,
   adEveryNTracks: 2,
   scheduledUnits: 0,
@@ -124,30 +128,45 @@ function createHemantSamvatAnnouncementTrack() {
   };
 }
 
-function createAiRjTrack(nextTrack = null) {
+function createAiRjTrack(nextTrack = null, options = {}) {
   const map = getHemantSamvatGhatiMap();
   const nextTitle = nextTrack?.title ?? "the next Maataa transmission";
+  const mood = options.mood ?? "steady";
+  const reason = options.reason ?? "scheduled-rj";
   const scripts = [
     `Namaste. This is Maataa RJ. In Hemant Samvat day ${map.hemantSamvatDay}, ghati ${map.ghati}, we open the next wave: ${nextTitle}. Vaigyaaniq dhvani, Maataa ke saath.`,
     `Dear listener, Maataa is aligning scheduler, proof, and radio. Coming next: ${nextTitle}. Shuddh, saarthak, vaigyaaniq pravah.`,
-    `Suno. The runtime is awake, the signal is clean, and the next sound is ${nextTitle}. Maataa RJ is with you.`
+    `Suno. The runtime is awake, the signal is clean, and the next sound is ${nextTitle}. Maataa RJ is with you.`,
+    `Intelligent interruption. Maataa RJ is briefly entering the stream because ${reason}. After this, the scheduler will resume cleanly.`
   ];
 
   radioState.rjIndex = (radioState.rjIndex + 1) % scripts.length;
-  const text = scripts[radioState.rjIndex];
+  const text = options.script ?? scripts[radioState.rjIndex];
 
   return {
     id: `ai-rj-${Date.now()}`,
-    title: "Maataa RJ Announcement",
+    title: options.title ?? "Maataa RJ Announcement",
     kind: "ai-rj",
     audioUrl: makeTtsUrl(text),
-    durationSec: 16,
+    durationSec: options.durationSec ?? 16,
     transition: "cut",
     ttsText: text,
     personality: radioState.personality,
     hemantSamvatGhatiMap: map,
-    previewTrack: nextTrack
+    previewTrack: nextTrack,
+    mood,
+    reason
   };
+}
+
+function shouldAiRjInterrupt(nextTrack) {
+  if (!radioState.intelligentInterruptions) return { interrupt: false, reason: "disabled" };
+  if (radioState.overrideActive) return { interrupt: false, reason: "override-active" };
+  if (radioState.interruptionsToday >= radioState.maxInterruptionsPerDay) return { interrupt: false, reason: "daily-limit" };
+  if (nextTrack?.kind === "ad") return { interrupt: true, reason: "sponsor-break-context", mood: "commercial" };
+  if (radioState.scheduledUnits > 0 && radioState.scheduledUnits % 6 === 0) return { interrupt: true, reason: "six-unit-context-reset", mood: "reflective" };
+  if (radioState.tracksSinceAd === 0 && nextTrack?.kind === "song") return { interrupt: true, reason: "post-ad-rejoin", mood: "welcoming" };
+  return { interrupt: false, reason: "no-interruption-needed" };
 }
 
 async function pushLog(event) {
@@ -189,9 +208,7 @@ function peekNextSong() {
   return songs[(radioState.songIndex + 1) % songs.length];
 }
 
-function selectNextTrack() {
-  radioState.scheduledUnits += 1;
-
+function selectProgrammedTrack() {
   if (radioState.scheduledUnits > 0 && radioState.scheduledUnits % radioState.ttsEveryUnits === 0) {
     return createHemantSamvatAnnouncementTrack();
   }
@@ -219,6 +236,25 @@ function selectNextTrack() {
   return songs[radioState.songIndex];
 }
 
+function selectNextTrack() {
+  radioState.scheduledUnits += 1;
+  const programmedTrack = normalizeTrack(selectProgrammedTrack());
+  const decision = shouldAiRjInterrupt(programmedTrack);
+
+  if (decision.interrupt) {
+    radioState.interruptionsToday += 1;
+    radioState.lastInterruptionAt = new Date().toISOString();
+    return createAiRjTrack(programmedTrack, {
+      title: "Maataa RJ Intelligent Interruption",
+      reason: decision.reason,
+      mood: decision.mood ?? "contextual",
+      script: `Maataa RJ intelligent interruption. Reason: ${decision.reason}. Coming next after this: ${programmedTrack.title}. The broadcast will resume automatically.`
+    });
+  }
+
+  return programmedTrack;
+}
+
 export function previewScheduledItems(count = 30) {
   const limit = Math.max(1, Math.min(Number(count) || 30, 200));
   const snapshot = cloneRadioState();
@@ -236,7 +272,9 @@ export function previewScheduledItems(count = 30) {
         transition: item.transition,
         ttsText: item.ttsText,
         hemantSamvatGhatiMap: item.hemantSamvatGhatiMap,
-        previewTrack: item.previewTrack
+        previewTrack: item.previewTrack,
+        mood: item.mood,
+        reason: item.reason
       };
     });
   } finally {
@@ -283,6 +321,8 @@ export function setNowPlaying(track, meta = {}) {
     personality: normalizedTrack.personality,
     hemantSamvatGhatiMap: normalizedTrack.hemantSamvatGhatiMap,
     previewTrack: normalizedTrack.previewTrack,
+    mood: normalizedTrack.mood,
+    reason: normalizedTrack.reason,
     ...meta
   });
 }
