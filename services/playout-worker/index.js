@@ -34,6 +34,8 @@ const radioState = {
   rjIndex: -1,
   currentTrackId: null,
   currentTrack: null,
+  overrideActive: false,
+  lastOverrideTrack: null,
   tracksSinceAd: 0,
   adEveryNTracks: 2,
   scheduledUnits: 0,
@@ -252,7 +254,7 @@ export function emitRadioEvent(event) {
     correlationId: event.correlationId ?? newCorrelationId("radio"),
     parentEventId: event.parentEventId ?? null,
     source: "radio",
-    type: event.type ?? "radio.event",
+    type: "radio.event",
     time: new Date().toISOString(),
     state: event.state ?? "ok",
     ...event
@@ -286,12 +288,33 @@ export function setNowPlaying(track, meta = {}) {
 }
 
 export function forcePlayTrack(track, meta = {}) {
-  return setNowPlaying(track, {
+  const normalizedTrack = normalizeTrack(track);
+  radioState.overrideActive = true;
+  radioState.lastOverrideTrack = normalizedTrack;
+
+  return setNowPlaying(normalizedTrack, {
     override: true,
     reason: meta.reason ?? "manual-preview-node-override",
     correlationId: meta.correlationId ?? newCorrelationId("override"),
     parentEventId: meta.parentEventId ?? null,
     ...meta
+  });
+}
+
+export function resumeScheduler(meta = {}) {
+  const wasOverride = radioState.overrideActive;
+  const overrideTrack = radioState.lastOverrideTrack;
+  radioState.overrideActive = false;
+  radioState.lastOverrideTrack = null;
+
+  return emitRadioEvent({
+    type: "radio.scheduler_resumed",
+    state: "ok",
+    correlationId: meta.correlationId ?? newCorrelationId("resume"),
+    parentEventId: meta.parentEventId ?? null,
+    wasOverride,
+    overrideTrack,
+    nextPreview: peekNextSong()
   });
 }
 
@@ -305,6 +328,8 @@ export function setRadioQueue(queue, meta = {}) {
   radioState.adIndex = -1;
   radioState.trackIndex = -1;
   radioState.tracksSinceAd = 0;
+  radioState.overrideActive = false;
+  radioState.lastOverrideTrack = null;
   return emitRadioEvent({
     type: "radio.queue_updated",
     correlationId: meta.correlationId ?? newCorrelationId("radio"),
@@ -318,6 +343,9 @@ export function updateRadioQueue(queue, meta = {}) {
 }
 
 export function scheduleNextRadioItem(meta = {}) {
+  if (radioState.overrideActive) {
+    resumeScheduler({ reason: "auto-resume-after-override" });
+  }
   const nextTrack = selectNextTrack();
   return setNowPlaying(nextTrack, meta);
 }
