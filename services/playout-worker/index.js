@@ -1,4 +1,8 @@
-import { persistRuntimeEvent } from "@maataa/runtime-db";
+import {
+  getRuntimeState,
+  persistRuntimeEvent,
+  persistRuntimeState
+} from "@maataa/runtime-db";
 
 const fallbackTracks = [
   {
@@ -27,60 +31,173 @@ const fallbackTracks = [
   }
 ];
 
-const radioState = {
-  trackIndex: -1,
-  songIndex: -1,
-  adIndex: -1,
-  rjIndex: -1,
-  currentTrackId: null,
-  currentTrack: null,
-  overrideActive: false,
-  lastOverrideTrack: null,
-  intelligentInterruptions: true,
-  interruptionsToday: 0,
-  maxInterruptionsPerDay: 12,
-  lastInterruptionAt: null,
-  llmProvider: process.env.AI_RJ_LLM_URL ? "http" : "template-fallback",
-  onlinePolicy: {
-    enabled: true,
-    explorationRate: 0.15,
-    interruptionBias: 0,
-    phraseBias: {},
-    reasonBias: {},
-    moodBias: {}
-  },
-  learning: {
-    scriptKnowledge: [],
-    preferredPhrases: [],
-    avoidPhrases: [],
-    providerStats: {},
-    reasonStats: {},
-    moodStats: {}
-  },
-  memory: {
-    playedHistory: [],
-    listenerMood: "calm",
-    sessionContext: {
-      startedAt: new Date().toISOString(),
-      theme: "Vaigyaaniq dhvani",
-      notes: []
-    }
-  },
-  tracksSinceAd: 0,
-  adEveryNTracks: 2,
-  scheduledUnits: 0,
-  ttsEveryUnits: 24,
-  aiRjEveryUnits: 4,
-  personality: {
-    name: "Maataa RJ",
-    tone: "warm, wise, poetic, futuristic",
-    languages: ["English", "Hindi", "Sanskrit transliteration"],
-    signature: "Vaigyaaniq dhvani, Maataa ke saath"
-  },
-  lastEvent: null,
-  logs: [],
-  queue: fallbackTracks
-};
+const RUNTIME_STATE_KEY = "radio";
+
+function createInitialRadioState() {
+  return {
+    trackIndex: -1,
+    songIndex: -1,
+    adIndex: -1,
+    rjIndex: -1,
+    currentTrackId: null,
+    currentTrack: null,
+    overrideActive: false,
+    lastOverrideTrack: null,
+    intelligentInterruptions: true,
+    interruptionsToday: 0,
+    maxInterruptionsPerDay: 12,
+    lastInterruptionAt: null,
+    llmProvider: process.env.AI_RJ_LLM_URL ? "http" : "template-fallback",
+    onlinePolicy: {
+      enabled: true,
+      explorationRate: 0.15,
+      interruptionBias: 0,
+      phraseBias: {},
+      reasonBias: {},
+      moodBias: {}
+    },
+    learning: {
+      scriptKnowledge: [],
+      preferredPhrases: [],
+      avoidPhrases: [],
+      providerStats: {},
+      reasonStats: {},
+      moodStats: {}
+    },
+    memory: {
+      playedHistory: [],
+      listenerMood: "calm",
+      sessionContext: {
+        startedAt: new Date().toISOString(),
+        theme: "Vaigyaaniq dhvani",
+        notes: []
+      }
+    },
+    tracksSinceAd: 0,
+    adEveryNTracks: 2,
+    scheduledUnits: 0,
+    ttsEveryUnits: 24,
+    aiRjEveryUnits: 4,
+    personality: {
+      name: "Maataa RJ",
+      tone: "warm, wise, poetic, futuristic",
+      languages: ["English", "Hindi", "Sanskrit transliteration"],
+      signature: "Vaigyaaniq dhvani, Maataa ke saath"
+    },
+    lastEvent: null,
+    logs: [],
+    queue: fallbackTracks.map((track) => ({ ...track }))
+  };
+}
+
+let radioState = createInitialRadioState();
+
+function sanitizeTrackList(value, fallback) {
+  if (!Array.isArray(value) || value.length === 0) {
+    return fallback.map((track) => ({ ...track }));
+  }
+
+  return value.map((track) => normalizeTrack(track));
+}
+
+function sanitizeRadioState(value) {
+  const baseState = createInitialRadioState();
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return baseState;
+  }
+
+  return {
+    ...baseState,
+    ...value,
+    personality: {
+      ...baseState.personality,
+      ...(value.personality && typeof value.personality === "object" ? value.personality : {})
+    },
+    onlinePolicy: {
+      ...baseState.onlinePolicy,
+      ...(value.onlinePolicy && typeof value.onlinePolicy === "object" ? value.onlinePolicy : {}),
+      phraseBias:
+        value.onlinePolicy?.phraseBias && typeof value.onlinePolicy.phraseBias === "object"
+          ? value.onlinePolicy.phraseBias
+          : baseState.onlinePolicy.phraseBias,
+      reasonBias:
+        value.onlinePolicy?.reasonBias && typeof value.onlinePolicy.reasonBias === "object"
+          ? value.onlinePolicy.reasonBias
+          : baseState.onlinePolicy.reasonBias,
+      moodBias:
+        value.onlinePolicy?.moodBias && typeof value.onlinePolicy.moodBias === "object"
+          ? value.onlinePolicy.moodBias
+          : baseState.onlinePolicy.moodBias
+    },
+    learning: {
+      ...baseState.learning,
+      ...(value.learning && typeof value.learning === "object" ? value.learning : {}),
+      scriptKnowledge: Array.isArray(value.learning?.scriptKnowledge)
+        ? value.learning.scriptKnowledge.slice(0, 100)
+        : baseState.learning.scriptKnowledge,
+      preferredPhrases: Array.isArray(value.learning?.preferredPhrases)
+        ? value.learning.preferredPhrases.slice(0, 100)
+        : baseState.learning.preferredPhrases,
+      avoidPhrases: Array.isArray(value.learning?.avoidPhrases)
+        ? value.learning.avoidPhrases.slice(0, 100)
+        : baseState.learning.avoidPhrases,
+      providerStats:
+        value.learning?.providerStats && typeof value.learning.providerStats === "object"
+          ? value.learning.providerStats
+          : baseState.learning.providerStats,
+      reasonStats:
+        value.learning?.reasonStats && typeof value.learning.reasonStats === "object"
+          ? value.learning.reasonStats
+          : baseState.learning.reasonStats,
+      moodStats:
+        value.learning?.moodStats && typeof value.learning.moodStats === "object"
+          ? value.learning.moodStats
+          : baseState.learning.moodStats
+    },
+    memory: {
+      ...baseState.memory,
+      ...(value.memory && typeof value.memory === "object" ? value.memory : {}),
+      playedHistory: Array.isArray(value.memory?.playedHistory)
+        ? value.memory.playedHistory.slice(0, 24)
+        : baseState.memory.playedHistory,
+      sessionContext: {
+        ...baseState.memory.sessionContext,
+        ...(value.memory?.sessionContext && typeof value.memory.sessionContext === "object"
+          ? value.memory.sessionContext
+          : {}),
+        notes: Array.isArray(value.memory?.sessionContext?.notes)
+          ? value.memory.sessionContext.notes.slice(0, 20)
+          : baseState.memory.sessionContext.notes
+      }
+    },
+    lastOverrideTrack: value.lastOverrideTrack ? normalizeTrack(value.lastOverrideTrack) : null,
+    currentTrack: value.currentTrack ? normalizeTrack(value.currentTrack) : null,
+    lastEvent:
+      value.lastEvent && typeof value.lastEvent === "object" && !Array.isArray(value.lastEvent)
+        ? value.lastEvent
+        : null,
+    logs: Array.isArray(value.logs) ? value.logs.slice(0, 50) : [],
+    queue: sanitizeTrackList(value.queue, fallbackTracks)
+  };
+}
+
+function snapshotRadioState() {
+  return JSON.parse(JSON.stringify(radioState));
+}
+
+async function saveRadioState() {
+  try {
+    await persistRuntimeState(RUNTIME_STATE_KEY, snapshotRadioState());
+  } catch {}
+}
+
+async function hydrateRadioState() {
+  const persisted = await getRuntimeState(RUNTIME_STATE_KEY, null);
+  radioState = sanitizeRadioState(persisted);
+  return radioState;
+}
+
+const radioStateReady = hydrateRadioState();
 
 const radioListeners = new Set();
 
@@ -406,6 +523,7 @@ async function pushLog(event) {
   try {
     await persistRuntimeEvent(event);
   } catch {}
+  await saveRadioState();
 }
 
 function normalizeTrack(track) {
@@ -517,10 +635,17 @@ export async function previewScheduledItems(count = 30) {
 }
 
 export function createRadioEmitter() {
-  return () => scheduleNextRadioItem();
+  return async () => scheduleNextRadioItem();
 }
 
-export function emitRadioEvent(event) {
+export async function ensureRadioStateReady() {
+  await radioStateReady;
+  return radioState;
+}
+
+export async function emitRadioEvent(event) {
+  await ensureRadioStateReady();
+
   const normalized = {
     id: event.id ?? `radio-${Date.now()}`,
     correlationId: event.correlationId ?? newCorrelationId("radio"),
@@ -531,11 +656,13 @@ export function emitRadioEvent(event) {
     state: event.state ?? "ok",
     ...event
   };
-  pushLog(normalized);
+  await pushLog(normalized);
   return normalized;
 }
 
-export function setNowPlaying(track, meta = {}) {
+export async function setNowPlaying(track, meta = {}) {
+  await ensureRadioStateReady();
+
   const normalizedTrack = normalizeTrack(track);
   rememberPlayedTrack(normalizedTrack, meta);
   const learnedScript = learnFromAiRjScript(normalizedTrack);
@@ -600,11 +727,13 @@ export function resumeScheduler(meta = {}) {
   });
 }
 
-export function updateNowPlaying(track, meta = {}) {
+export async function updateNowPlaying(track, meta = {}) {
   return setNowPlaying(track, meta);
 }
 
-export function setRadioQueue(queue, meta = {}) {
+export async function setRadioQueue(queue, meta = {}) {
+  await ensureRadioStateReady();
+
   radioState.queue = queue.map(normalizeTrack);
   radioState.songIndex = -1;
   radioState.adIndex = -1;
@@ -622,13 +751,13 @@ export function setRadioQueue(queue, meta = {}) {
   });
 }
 
-export function updateRadioQueue(queue, meta = {}) {
+export async function updateRadioQueue(queue, meta = {}) {
   return setRadioQueue(queue, meta);
 }
 
 export async function scheduleNextRadioItem(meta = {}) {
   if (radioState.overrideActive) {
-    resumeScheduler({ reason: "auto-resume-after-override" });
+    await resumeScheduler({ reason: "auto-resume-after-override" });
   }
   const nextTrack = await selectNextTrack();
   return setNowPlaying(nextTrack, meta);

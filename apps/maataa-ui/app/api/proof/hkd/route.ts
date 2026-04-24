@@ -1,6 +1,9 @@
 import { getSchedulerState } from "../../../../../../services/scheduler/index.js";
 import { getProofState, emitProofEvent } from "../../../../../../services/proof-worker/index.js";
-import { getRadioState } from "../../../../../../services/playout-worker/index.js";
+import {
+  ensureRadioStateReady,
+  getRadioState
+} from "../../../../../../services/playout-worker/index.js";
 import {
   buildMerkleLeaves,
   buildMerkleRoot,
@@ -9,6 +12,7 @@ import {
 } from "@/lib/proof";
 
 export async function GET() {
+  await ensureRadioStateReady();
   const scheduler = (getSchedulerState().logs ?? []).map((event) => ({
     ...event,
     proofLabel: "RUNTIME_EVENT"

@@ -1,8 +1,12 @@
 import { getSchedulerState } from "../../../../../../services/scheduler/index.js";
 import { getProofState } from "../../../../../../services/proof-worker/index.js";
-import { getRadioState } from "../../../../../../services/playout-worker/index.js";
+import {
+  ensureRadioStateReady,
+  getRadioState
+} from "../../../../../../services/playout-worker/index.js";
 
 export async function GET() {
+  await ensureRadioStateReady();
   const scheduler = getSchedulerState().logs ?? [];
   const proof = getProofState().logs ?? [];
   const radio = getRadioState().logs ?? [];
