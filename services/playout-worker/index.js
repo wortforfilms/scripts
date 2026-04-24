@@ -29,10 +29,14 @@ const fallbackTracks = [
 
 const radioState = {
   trackIndex: -1,
+  songIndex: -1,
+  adIndex: -1,
   currentTrackId: null,
   currentTrack: null,
   tracksSinceAd: 0,
   adEveryNTracks: 2,
+  scheduledUnits: 0,
+  ttsEveryUnits: 24,
   lastEvent: null,
   logs: [],
   queue: fallbackTracks
@@ -50,6 +54,40 @@ function notify(event) {
 
 function newCorrelationId(prefix = "corr") {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getHemantSamvatGhatiMap(date = new Date()) {
+  const epoch = Date.parse("1979-01-14T00:00:00.000Z");
+  const elapsedMs = date.getTime() - epoch;
+  const elapsedDays = Math.floor(elapsedMs / 86400000);
+  const dayMs = ((elapsedMs % 86400000) + 86400000) % 86400000;
+  const ghati = Math.floor(dayMs / (24 * 60 * 1000));
+  const pala = Math.floor((dayMs % (24 * 60 * 1000)) / (24 * 1000));
+
+  return {
+    epoch: "1979-01-14T00:00:00.000Z",
+    hemantSamvatDay: elapsedDays,
+    ghati,
+    pala,
+    unit24: Math.floor(radioState.scheduledUnits / 24),
+    scheduledUnits: radioState.scheduledUnits
+  };
+}
+
+function createHemantSamvatAnnouncementTrack() {
+  const map = getHemantSamvatGhatiMap();
+  const text = `Hemant Samvat day ${map.hemantSamvatDay}, ghati ${map.ghati}, pala ${map.pala}. Maataa radio time unit ${map.scheduledUnits}.`;
+
+  return {
+    id: `tts-hemant-samvat-${Date.now()}`,
+    title: `Hemant Samvat Ghati Announcement`,
+    kind: "tts",
+    audioUrl: `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${encodeURIComponent(text)}`,
+    durationSec: 12,
+    transition: "cut",
+    ttsText: text,
+    hemantSamvatGhatiMap: map
+  };
 }
 
 async function pushLog(event) {
@@ -85,19 +123,29 @@ function normalizeTrack(track) {
 }
 
 function selectNextTrack() {
+  radioState.scheduledUnits += 1;
+
+  if (radioState.scheduledUnits > 0 && radioState.scheduledUnits % radioState.ttsEveryUnits === 0) {
+    return createHemantSamvatAnnouncementTrack();
+  }
+
   const queue = radioState.queue.length ? radioState.queue : fallbackTracks;
   const ads = queue.filter((item) => item.kind === "ad");
-  const songs = queue.filter((item) => item.kind !== "ad");
+  const songs = queue.filter((item) => item.kind !== "ad" && item.kind !== "tts");
 
   if (ads.length && radioState.tracksSinceAd >= radioState.adEveryNTracks) {
     radioState.tracksSinceAd = 0;
-    return ads[radioState.trackIndex % ads.length] ?? ads[0];
+    radioState.adIndex = (radioState.adIndex + 1) % ads.length;
+    return ads[radioState.adIndex];
   }
 
-  const nextSongIndex = songs.length ? (radioState.trackIndex + 1) % songs.length : 0;
-  radioState.trackIndex = nextSongIndex;
+  if (!songs.length) return queue[0];
+
+  radioState.songIndex = (radioState.songIndex + 1) % songs.length;
+  radioState.trackIndex = radioState.songIndex;
   radioState.tracksSinceAd += 1;
-  return songs[nextSongIndex] ?? queue[0];
+
+  return songs[radioState.songIndex];
 }
 
 export function createRadioEmitter() {
@@ -111,7 +159,7 @@ export function emitRadioEvent(event) {
     parentEventId: event.parentEventId ?? null,
     source: "radio",
     type: event.type ?? "radio.event",
-    time: event.time ?? new Date().toISOString(),
+    time: new Date().toISOString(),
     state: event.state ?? "ok",
     ...event
   };
@@ -135,6 +183,8 @@ export function setNowPlaying(track, meta = {}) {
     durationSec: normalizedTrack.durationSec,
     kind: normalizedTrack.kind,
     transition: normalizedTrack.transition,
+    ttsText: normalizedTrack.ttsText,
+    hemantSamvatGhatiMap: normalizedTrack.hemantSamvatGhatiMap,
     ...meta
   });
 }
@@ -145,6 +195,10 @@ export function updateNowPlaying(track, meta = {}) {
 
 export function setRadioQueue(queue, meta = {}) {
   radioState.queue = queue.map(normalizeTrack);
+  radioState.songIndex = -1;
+  radioState.adIndex = -1;
+  radioState.trackIndex = -1;
+  radioState.tracksSinceAd = 0;
   return emitRadioEvent({
     type: "radio.queue_updated",
     correlationId: meta.correlationId ?? newCorrelationId("radio"),
