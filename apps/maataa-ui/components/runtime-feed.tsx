@@ -16,6 +16,10 @@ function badge(state: RuntimeEvent["state"]) {
   return "bg-rose-500/10 text-rose-300";
 }
 
+function normalizeState(value: unknown): RuntimeEvent["state"] {
+  return value === "warn" || value === "critical" ? value : "ok";
+}
+
 export function RuntimeFeed() {
   const [events, setEvents] = useState<RuntimeEvent[]>(seed);
 
@@ -27,19 +31,17 @@ export function RuntimeFeed() {
           id: parsed.id ?? crypto.randomUUID(),
           time: parsed.time ?? new Date().toLocaleTimeString(),
           type: parsed.type ?? "runtime.event",
-          state: parsed.state ?? "ok"
+          state: normalizeState(parsed.state)
         };
         setEvents((current) => [event, ...current].slice(0, 20));
       } catch {
-        setEvents((current) => [
-          {
-            id: crypto.randomUUID(),
-            time: new Date().toLocaleTimeString(),
-            type: "runtime.raw",
-            state: "warn"
-          },
-          ...current
-        ].slice(0, 20));
+        const fallbackEvent: RuntimeEvent = {
+          id: crypto.randomUUID(),
+          time: new Date().toLocaleTimeString(),
+          type: "runtime.raw",
+          state: "warn"
+        };
+        setEvents((current) => [fallbackEvent, ...current].slice(0, 20));
       }
     });
   }, []);

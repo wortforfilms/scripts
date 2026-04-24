@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useParams } from "next/navigation";
-import { buildMerkleLeaves, sha256 } from "@/lib/proof";
+import { buildMerkleLeaves, sha256 } from "@/lib/proof-client";
 
 type TimelineEvent = {
   id: string;

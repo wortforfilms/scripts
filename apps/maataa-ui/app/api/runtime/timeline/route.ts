@@ -5,14 +5,19 @@ import {
   getRadioState
 } from "../../../../../../services/playout-worker/index.js";
 
+type TimelineEvent = {
+  time?: string;
+  [key: string]: unknown;
+};
+
 export async function GET() {
   await ensureRadioStateReady();
-  const scheduler = getSchedulerState().logs ?? [];
-  const proof = getProofState().logs ?? [];
-  const radio = getRadioState().logs ?? [];
+  const scheduler = (getSchedulerState().logs ?? []) as TimelineEvent[];
+  const proof = (getProofState().logs ?? []) as TimelineEvent[];
+  const radio = (getRadioState().logs ?? []) as TimelineEvent[];
 
-  const timeline = [...scheduler, ...proof, ...radio].sort((a, b) => {
-    return new Date(b.time).getTime() - new Date(a.time).getTime();
+  const timeline: TimelineEvent[] = [...scheduler, ...proof, ...radio].sort((a, b) => {
+    return new Date(b.time ?? 0).getTime() - new Date(a.time ?? 0).getTime();
   });
 
   return Response.json({

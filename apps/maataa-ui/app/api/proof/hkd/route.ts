@@ -11,23 +11,35 @@ import {
   exportPublicKey
 } from "@/lib/proof";
 
+function toEventRecord(event: unknown) {
+  if (!event || typeof event !== "object" || Array.isArray(event)) {
+    return {};
+  }
+
+  return event as Record<string, unknown>;
+}
+
+type ProofTimelineEvent = Record<string, unknown> & {
+  time?: string;
+};
+
 export async function GET() {
   await ensureRadioStateReady();
-  const scheduler = (getSchedulerState().logs ?? []).map((event) => ({
-    ...event,
+  const scheduler: ProofTimelineEvent[] = (getSchedulerState().logs ?? []).map((event) => ({
+    ...toEventRecord(event),
     proofLabel: "RUNTIME_EVENT"
   }));
-  const proof = (getProofState().logs ?? []).map((event) => ({
-    ...event,
+  const proof: ProofTimelineEvent[] = (getProofState().logs ?? []).map((event) => ({
+    ...toEventRecord(event),
     proofLabel: "PROOF_EVENT"
   }));
-  const radio = (getRadioState().logs ?? []).map((event) => ({
-    ...event,
+  const radio: ProofTimelineEvent[] = (getRadioState().logs ?? []).map((event) => ({
+    ...toEventRecord(event),
     proofLabel: "BROADCAST_PROOF"
   }));
 
   const timeline = [...scheduler, ...proof, ...radio]
-    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+    .sort((a, b) => new Date(a.time ?? 0).getTime() - new Date(b.time ?? 0).getTime());
 
   const leaves = buildMerkleLeaves(timeline);
   const root = buildMerkleRoot(leaves);

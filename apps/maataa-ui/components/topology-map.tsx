@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTopologyStore } from "@/lib/topology-store";
+import type { ServiceNode } from "@/lib/types";
 
 function clamp(v: number) {
   return Math.max(8, Math.min(92, v));
@@ -24,7 +25,7 @@ export function TopologyMap() {
       onMouseUp={() => setDrag(null)}
       onMouseLeave={() => setDrag(null)}
     >
-      {nodes.map((n: any) => (
+      {nodes.map((n: ServiceNode) => (
         <button
           key={n.id}
           onMouseDown={() => setDrag(n.id)}

@@ -5,7 +5,7 @@ import type { RuntimeEvent } from "@/lib/types";
 import { connectEvents } from "@/lib/events";
 import { RuntimeEventsViewer } from "@/components/runtime-events-viewer";
 
-type NodeState = "ok" | "warn" | "error";
+type NodeState = RuntimeEvent["state"];
 
 type StatusNode = {
   id: string;
@@ -50,6 +50,10 @@ function inferNodeId(event: RuntimeEvent) {
   return "scheduler";
 }
 
+function normalizeState(value: unknown): RuntimeEvent["state"] {
+  return value === "warn" || value === "critical" ? value : "ok";
+}
+
 function badge(state: NodeState) {
   if (state === "ok") return "bg-emerald-500/10 text-emerald-300 border-emerald-500/20";
   if (state === "warn") return "bg-yellow-500/10 text-yellow-300 border-yellow-500/20";
@@ -72,12 +76,12 @@ export default function StatusPage() {
       setConnected(true);
 
       const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-      const event: RuntimeEvent = {
-        id: parsed.id ?? crypto.randomUUID(),
-        time: parsed.time ?? new Date().toLocaleTimeString(),
-        type: parsed.type ?? "runtime.event",
-        state: parsed.state ?? "ok",
-      };
+        const event: RuntimeEvent = {
+          id: parsed.id ?? crypto.randomUUID(),
+          time: parsed.time ?? new Date().toLocaleTimeString(),
+          type: parsed.type ?? "runtime.event",
+          state: normalizeState(parsed.state),
+        };
 
       const nodeId = inferNodeId(event);
 
@@ -106,7 +110,7 @@ export default function StatusPage() {
       totalEvents: events.length,
       ok: nodes.filter((n) => n.state === "ok").length,
       warn: nodes.filter((n) => n.state === "warn").length,
-      error: nodes.filter((n) => n.state === "error").length,
+      critical: nodes.filter((n) => n.state === "critical").length,
     };
   }, [events, nodes]);
 
@@ -141,7 +145,7 @@ export default function StatusPage() {
           </div>
           <div className="rounded-3xl border border-rose-500/10 bg-rose-500/5 p-5">
             <div className="text-sm text-rose-300/80">Error Nodes</div>
-            <div className="mt-2 text-3xl font-semibold text-white">{totals.error}</div>
+            <div className="mt-2 text-3xl font-semibold text-white">{totals.critical}</div>
           </div>
         </div>
 

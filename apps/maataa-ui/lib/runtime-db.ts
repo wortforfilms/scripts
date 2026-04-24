@@ -62,11 +62,13 @@ export async function listRuntimeEvents(limit = 100) {
   });
 
   return result.rows.map((row) => ({
-    id: String(row.id),
-    source: String(row.source),
-    type: String(row.type),
-    state: String(row.state),
-    time: String(row.time),
-    payload: row.payload_json ? JSON.parse(String(row.payload_json)) : null
+    id: String((row as Record<string, unknown>).id),
+    source: String((row as Record<string, unknown>).source),
+    type: String((row as Record<string, unknown>).type),
+    state: String((row as Record<string, unknown>).state),
+    time: String((row as Record<string, unknown>).time),
+    payload: (row as Record<string, unknown>).payload_json
+      ? JSON.parse(String((row as Record<string, unknown>).payload_json))
+      : null
   }));
 }

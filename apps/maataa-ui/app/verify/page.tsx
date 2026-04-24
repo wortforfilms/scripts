@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { buildMerkleLeaves, buildMerkleRoot, sha256, verifyRoot } from "@/lib/proof";
+import { buildMerkleLeaves, buildMerkleRoot, sha256, verifyRoot } from "@/lib/proof-client";
 
 type HkdFile = {
   merkleRoot?: string;
@@ -61,6 +61,24 @@ export default function VerifyPage() {
   const layers = useMemo(() => buildLayerObjects(leaves), [leaves]);
   const recomputedRoot = useMemo(() => buildMerkleRoot(leaves), [leaves]);
 
+  useEffect(() => {
+    async function recomputeStatus() {
+      if (!hkd) {
+        setStatus(null);
+        return;
+      }
+
+      const rootMatches = hkd.merkleRoot === buildMerkleRoot(buildMerkleLeaves(hkd.payload ?? []));
+      const signatureValid =
+        Boolean(hkd.signature && hkd.merkleRoot && hkd.publicKey) &&
+        (await verifyRoot(hkd.merkleRoot!, hkd.signature!, hkd.publicKey!));
+
+      setStatus({ rootMatches, signatureValid });
+    }
+
+    void recomputeStatus();
+  }, [hkd]);
+
   async function onFileChange(file?: File | null) {
     if (!file) return;
     const text = await file.text();
@@ -68,10 +86,6 @@ export default function VerifyPage() {
     setHkd(parsed);
     setSelectedIndex(null);
     setActiveLayer(-1);
-    setStatus({
-      rootMatches: parsed.merkleRoot === buildMerkleRoot(buildMerkleLeaves(parsed.payload ?? [])),
-      signatureValid: parsed.signature && parsed.merkleRoot ? verifyRoot(parsed.merkleRoot, parsed.signature) : false
-    });
   }
 
   function startTraversal(index: number) {

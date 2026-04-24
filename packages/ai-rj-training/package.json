@@ -1,0 +1,6 @@
+{
+  "name": "@maataa/ai-rj-training",
+  "private": true,
+  "type": "module",
+  "main": "index.js"
+}

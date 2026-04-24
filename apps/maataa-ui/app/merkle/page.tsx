@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { buildMerkleLeaves, buildMerkleRoot, sha256 } from "@/lib/proof";
+import { buildMerkleLeaves, buildMerkleRoot, sha256 } from "@/lib/proof-client";
 
 type TimelineEvent = {
   id: string;
