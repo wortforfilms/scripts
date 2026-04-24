@@ -285,6 +285,16 @@ export function setNowPlaying(track, meta = {}) {
   });
 }
 
+export function forcePlayTrack(track, meta = {}) {
+  return setNowPlaying(track, {
+    override: true,
+    reason: meta.reason ?? "manual-preview-node-override",
+    correlationId: meta.correlationId ?? newCorrelationId("override"),
+    parentEventId: meta.parentEventId ?? null,
+    ...meta
+  });
+}
+
 export function updateNowPlaying(track, meta = {}) {
   return setNowPlaying(track, meta);
 }
