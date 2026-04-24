@@ -1,0 +1,12 @@
+.git
+.gitignore
+node_modules
+**/node_modules
+.turbo
+**/.next
+**/dist
+**/coverage
+**/.maataa-data
+apps/maataa-ui/tsconfig.tsbuildinfo
+pnpm-lock.yaml
+deploy/vps/runtime

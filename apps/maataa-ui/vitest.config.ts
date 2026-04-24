@@ -10,6 +10,19 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    globals: true
+    globals: true,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "json-summary"],
+      reportsDirectory: resolve(__dirname, "coverage"),
+      include: [
+        "app/api/**/*.ts",
+        "lib/**/*.ts"
+      ],
+      exclude: [
+        "**/*.d.ts",
+        "app/api/health/route.ts"
+      ]
+    }
   }
 });

@@ -14,12 +14,20 @@ type QueueItem = {
   duration: number;
 };
 
+type RadioConfig = {
+  station: string;
+  streamUrl: string;
+  radioPageUrl?: string;
+};
+
 export default function RadioLivePage() {
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [config, setConfig] = useState<RadioConfig | null>(null);
 
   useEffect(() => {
     const fetchData = () => {
+      fetch("/api/radio/config").then(r => r.json()).then(setConfig);
       fetch("/api/radio/now-playing").then(r => r.json()).then(setNowPlaying);
       fetch("/api/radio/queue").then(r => r.json()).then(d => setQueue(d.queue));
     };
@@ -37,8 +45,9 @@ export default function RadioLivePage() {
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
           <div className="text-sm text-white/50">Now Playing</div>
           <div className="text-xl">{nowPlaying?.title}</div>
+          <div className="mt-1 text-xs text-white/45">{config?.station ?? "Maataa Radio"}</div>
           <audio controls className="w-full mt-3">
-            <source src={nowPlaying?.streamUrl ?? "http://localhost:8000/stream"} />
+            <source src={nowPlaying?.streamUrl ?? config?.streamUrl ?? "/radio"} />
           </audio>
         </div>
 

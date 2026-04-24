@@ -1,0 +1,28 @@
+{
+  "version": "0.2.1",
+  "type": "HKD",
+  "merkleRoot": "2ec447941f6bd2a621f299d6c70e477af02cd55a60f0216eb03bfeaf6f775ce2",
+  "signature": "MhQgqK/vXq3NLSDnQ0h3z1e9XpBao6n0r7nLAYpApVuVvq5RALdT26sZANVep9g/tW1STowz017zI8hhghvlBA==",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEATXHtT+y6ao7lYRfI3pZyFOElAsKqLwcc/cRhmy2T3/w=\n-----END PUBLIC KEY-----\n",
+  "payload": [
+    {
+      "id": "1",
+      "proofLabel": "RUNTIME_EVENT",
+      "time": "2026-04-22T00:00:00.000Z",
+      "type": "scheduler.tick"
+    },
+    {
+      "id": "2",
+      "proofLabel": "BROADCAST_PROOF",
+      "time": "2026-04-22T00:01:00.000Z",
+      "type": "radio.now_playing"
+    },
+    {
+      "id": "3",
+      "proofLabel": "PROOF_EVENT",
+      "time": "2026-04-22T00:02:00.000Z",
+      "type": "proof.generated"
+    }
+  ],
+  "exportedAt": "2026-04-22T00:03:00.000Z"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@maataa/scripts-data",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/verified-scripts.seed.ts",
+    "./schema": "./src/script.schema.ts",
+    "./kharosthi-chain": "./src/kharosthi-chain.ts",
+    "./validate": "./src/validate-scripts.ts"
+  }
+}

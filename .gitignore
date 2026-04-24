@@ -3,6 +3,7 @@ node_modules
 dist
 build
 coverage
+apps/maataa-ui/cypress/artifacts/
 .turbo
 .env
 .env.local

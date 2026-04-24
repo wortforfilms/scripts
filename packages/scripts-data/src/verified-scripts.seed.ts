@@ -1,0 +1,83 @@
+import { assertValidScripts, type ScriptRecord } from "./script.schema";
+import { kharosthiChain } from "./kharosthi-chain";
+
+export const verifiedScriptsSeed: ScriptRecord[] = [
+  {
+    id: "latin",
+    slug: "latin",
+    name: "Latin",
+    nativeName: "Latin",
+    verifiedUnicodeSample: "Scriptorium",
+    fallbackGlyphAsset: "/glyphs/latin.svg",
+    family: "Italic",
+    parentId: null,
+    region: "Europe and global",
+    eraStart: -700,
+    eraEnd: null,
+    direction: "LTR",
+    verificationStatus: "VERIFIED",
+    sources: ["Unicode Standard, Basic Latin U+0000-U+007F"]
+  },
+  {
+    id: "devanagari",
+    slug: "devanagari",
+    name: "Devanagari",
+    nativeName: "देवनागरी",
+    verifiedUnicodeSample: "देवनागरी",
+    fallbackGlyphAsset: "/glyphs/devanagari.svg",
+    family: "Brahmic",
+    parentId: null,
+    region: "South Asia",
+    eraStart: 700,
+    eraEnd: null,
+    direction: "LTR",
+    verificationStatus: "VERIFIED",
+    sources: ["Unicode Standard, Devanagari block U+0900-U+097F"]
+  },
+  {
+    id: "tamil",
+    slug: "tamil",
+    name: "Tamil",
+    nativeName: "தமிழ்",
+    verifiedUnicodeSample: "தமிழ்",
+    fallbackGlyphAsset: "/glyphs/tamil.svg",
+    family: "Brahmic",
+    parentId: null,
+    region: "South India and Sri Lanka",
+    eraStart: -300,
+    eraEnd: null,
+    direction: "LTR",
+    verificationStatus: "VERIFIED",
+    sources: ["Unicode Standard, Tamil block U+0B80-U+0BFF"]
+  },
+  {
+    id: "hebrew",
+    slug: "hebrew",
+    name: "Hebrew",
+    nativeName: "עברית",
+    verifiedUnicodeSample: "עברית",
+    fallbackGlyphAsset: "/glyphs/hebrew.svg",
+    family: "Northwest Semitic",
+    parentId: null,
+    region: "Levant and global",
+    eraStart: -1000,
+    eraEnd: null,
+    direction: "RTL",
+    verificationStatus: "VERIFIED",
+    sources: ["Unicode Standard, Hebrew block U+0590-U+05FF"]
+  },
+  ...kharosthiChain
+];
+
+assertValidScripts(verifiedScriptsSeed);
+
+export const SCRIPT_DATASET_TARGET_COUNT = 426;
+
+export function scriptDatasetStatus() {
+  return {
+    target: SCRIPT_DATASET_TARGET_COUNT,
+    current: verifiedScriptsSeed.length,
+    complete: verifiedScriptsSeed.length >= SCRIPT_DATASET_TARGET_COUNT,
+    note: "Only verified or explicitly partial records are seeded. Missing scripts remain excluded until source verification."
+  };
+}

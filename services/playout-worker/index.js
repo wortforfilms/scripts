@@ -3,6 +3,7 @@ import {
   persistRuntimeEvent,
   persistRuntimeState
 } from "@maataa/runtime-db";
+import { buildSafeTtsAudioUrl, getAudioRuntimeConfig } from "./audio-config.js";
 
 const fallbackTracks = [
   {
@@ -394,23 +395,21 @@ function getHemantSamvatGhatiMap(date = new Date()) {
   };
 }
 
-function makeTtsUrl(text, lang = "en") {
-  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${lang}&q=${encodeURIComponent(text)}`;
-}
-
 function createHemantSamvatAnnouncementTrack() {
   const map = getHemantSamvatGhatiMap();
   const text = `Hemant Samvat day ${map.hemantSamvatDay}, ghati ${map.ghati}, pala ${map.pala}. Maataa radio time unit ${map.scheduledUnits}.`;
+  const audioRuntime = getAudioRuntimeConfig();
 
   return {
     id: `tts-hemant-samvat-${Date.now()}`,
     title: `Hemant Samvat Ghati Announcement`,
     kind: "tts",
-    audioUrl: makeTtsUrl(text),
+    audioUrl: buildSafeTtsAudioUrl(text, audioRuntime.defaultTtsLang),
     durationSec: 12,
     transition: "cut",
     ttsText: text,
-    hemantSamvatGhatiMap: map
+    hemantSamvatGhatiMap: map,
+    ttsProvider: audioRuntime.ttsMode
   };
 }
 
@@ -487,11 +486,12 @@ async function createAiRjTrack(nextTrack = null, options = {}) {
     id: `ai-rj-${Date.now()}`,
     title: options.title ?? "Maataa RJ Announcement",
     kind: "ai-rj",
-    audioUrl: makeTtsUrl(scriptResult.text),
+    audioUrl: buildSafeTtsAudioUrl(scriptResult.text),
     durationSec: options.durationSec ?? 16,
     transition: "cut",
     ttsText: scriptResult.text,
     scriptProvider: scriptResult.provider,
+    ttsProvider: getAudioRuntimeConfig().ttsMode,
     personality: radioState.personality,
     hemantSamvatGhatiMap: map,
     previewTrack: nextTrack,

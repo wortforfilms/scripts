@@ -7,13 +7,19 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "start-server-and-test \"pnpm dev --hostname 127.0.0.1 --port 3000\" http://127.0.0.1:3000 \"pnpm e2e:warm && pnpm cypress:run\"",
     "test:watch": "vitest",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run --e2e --browser chrome",
+    "e2e:warm": "node ./scripts/warm-e2e-routes.mjs",
     "tunnel": "cloudflared tunnel --url http://localhost:3000",
     "tunnel:6789": "cloudflared tunnel --url http://localhost:6789",
     "radio:live": "cloudflared tunnel --url http://localhost:8000",
     "verify:public": "cloudflared tunnel --url http://localhost:3000"
   },
   "dependencies": {
+    "@libsql/client": "^0.15.15",
     "ethers": "^6.13.4",
     "framer-motion": "^11.3.19",
     "lucide-react": "^0.453.0",
@@ -24,9 +30,13 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.12",
+    "@types/react-dom": "^19.2.3",
     "@types/react": "^19.2.14",
+    "@vitest/coverage-v8": "^3.2.4",
     "autoprefixer": "^10.4.21",
+    "cypress": "^14.5.4",
     "postcss": "^8.5.6",
+    "start-server-and-test": "^2.1.2",
     "tailwindcss": "^4.1.12",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

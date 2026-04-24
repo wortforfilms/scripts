@@ -1,4 +1,4 @@
-import { createClient } from "@libsql/client";
+import { createClient } from "@libsql/client/node";
 
 const databaseUrl = process.env.RUNTIME_DATABASE_URL ?? process.env.DATABASE_URL ?? "file:./.maataa-data/runtime.db";
 const authToken = process.env.RUNTIME_DATABASE_AUTH_TOKEN ?? process.env.TURSO_AUTH_TOKEN;

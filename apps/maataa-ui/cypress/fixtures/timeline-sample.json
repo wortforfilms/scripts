@@ -1,0 +1,22 @@
+{
+  "timeline": [
+    {
+      "id": "evt-1",
+      "source": "scheduler",
+      "time": "2026-04-22T00:00:00.000Z",
+      "type": "scheduler.tick"
+    },
+    {
+      "id": "evt-2",
+      "source": "radio",
+      "time": "2026-04-22T00:01:00.000Z",
+      "type": "radio.now_playing"
+    },
+    {
+      "id": "evt-3",
+      "source": "proof",
+      "time": "2026-04-22T00:02:00.000Z",
+      "type": "proof.generated"
+    }
+  ]
+}

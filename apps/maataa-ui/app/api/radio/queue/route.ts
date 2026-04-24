@@ -1,9 +1,17 @@
+import {
+  ensureRadioStateReady,
+  getRadioState
+} from "../../../../../../services/playout-worker/index.js";
+
 export async function GET() {
-  return Response.json({
-    queue: [
-      { id: "1", title: "Om Resonance", duration: 180 },
-      { id: "2", title: "Cosmic Flow", duration: 210 },
-      { id: "3", title: "Chakra Pulse", duration: 240 }
-    ]
-  });
+  await ensureRadioStateReady();
+
+  const queue = (getRadioState().queue ?? []).map((item) => ({
+    id: item.id,
+    title: item.title,
+    duration: item.durationSec ?? 0,
+    kind: item.kind ?? "song"
+  }));
+
+  return Response.json({ queue });
 }

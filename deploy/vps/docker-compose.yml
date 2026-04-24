@@ -1,0 +1,36 @@
+services:
+  maataa-ui:
+    build:
+      context: ../..
+      dockerfile: apps/maataa-ui/Dockerfile
+    env_file:
+      - .env
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - maataa_runtime:/app/.maataa-data
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - maataa-ui
+      - icecast
+
+  icecast:
+    image: moul/icecast
+    restart: unless-stopped
+
+volumes:
+  maataa_runtime:
+  caddy_data:
+  caddy_config:

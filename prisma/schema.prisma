@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum PublishStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PARTIAL
+  VERIFIED
+}
+
+enum ScriptDirection {
+  LTR
+  RTL
+  TTB
+  BTT
+}
+
+enum UserRole {
+  USER
+  REVIEWER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+}
+
+enum SpineJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model Script {
+  id                    String             @id
+  slug                  String             @unique
+  name                  String
+  nativeName            String
+  verifiedUnicodeSample String?
+  fallbackGlyphAsset    String
+  family                String
+  parentId              String?
+  parent                Script?            @relation("ScriptTree", fields: [parentId], references: [id])
+  children              Script[]           @relation("ScriptTree")
+  region                String
+  eraStart              Int?
+  eraEnd                Int?
+  direction             ScriptDirection
+  verificationStatus    VerificationStatus @default(UNVERIFIED)
+  publishStatus         PublishStatus      @default(DRAFT)
+  sources               ScriptSource[]
+  products              Product[]
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+}
+
+model ScriptSource {
+  id        String   @id @default(cuid())
+  scriptId  String
+  script    Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  label     String
+  url       String?
+  createdAt DateTime @default(now())
+}
+
+model Product {
+  id            String        @id @default(cuid())
+  slug          String        @unique
+  title         String
+  description   String
+  productType   String
+  scriptId      String?
+  script        Script?       @relation(fields: [scriptId], references: [id])
+  publishStatus PublishStatus @default(DRAFT)
+  isPaid        Boolean       @default(true)
+  priceInPaise  Int
+  currency      String        @default("INR")
+  skus          SKU[]
+  bundles       Bundle[]      @relation("BundleProducts")
+  accesses      UserAccess[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model SKU {
+  id             String          @id @default(cuid())
+  code           String          @unique
+  productId      String
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  publishStatus  PublishStatus   @default(DRAFT)
+  isActive       Boolean         @default(false)
+  approvals      AdminApproval[]
+  orderItemsJson String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Bundle {
+  id            String        @id @default(cuid())
+  slug          String        @unique
+  title         String
+  publishStatus PublishStatus @default(DRAFT)
+  products      Product[]     @relation("BundleProducts")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String
+  status          OrderStatus @default(PENDING_PAYMENT)
+  amountInPaise   Int
+  currency        String      @default("INR")
+  razorpayOrderId String?     @unique
+  itemsJson       String
+  payments        Payment[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider          String
+  providerPaymentId String?
+  providerOrderId   String?
+  status            PaymentStatus @default(CREATED)
+  signatureVerified Boolean       @default(false)
+  rawEventJson       String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+model UserAccess {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderId   String
+  grantedAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+model AdminApproval {
+  id        String        @id @default(cuid())
+  skuId     String
+  sku       SKU           @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  status    PublishStatus
+  actorId   String
+  note      String?
+  createdAt DateTime      @default(now())
+}
+
+model SpineEvent {
+  id          String   @id @default(cuid())
+  type        String
+  actorId     String?
+  subjectId   String?
+  payloadJson String?
+  createdAt   DateTime @default(now())
+}
+
+model SpineJob {
+  id          String         @id @default(cuid())
+  type        String
+  status      SpineJobStatus @default(PENDING)
+  attempts    Int            @default(0)
+  payloadJson String?
+  lastError   String?
+  runAfter    DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model SpineAuditLog {
+  id          String   @id @default(cuid())
+  eventType   String
+  actorId     String?
+  subjectId   String?
+  payloadJson String?
+  createdAt   DateTime @default(now())
+}

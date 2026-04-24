@@ -94,8 +94,8 @@ export default function MerklePage() {
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
           <div className="text-sm text-white/50">Merkle Root</div>
-          <div className="mt-2 break-all font-mono text-sm text-white">{root}</div>
-          <div className="mt-3 text-xs text-yellow-300/80">
+          <div className="mt-2 break-all font-mono text-sm text-white" data-testid="merkle-root">{root}</div>
+          <div className="mt-3 text-xs text-yellow-300/80" data-testid="merkle-traversal-status">
             {selectedIndex !== null
               ? `Traversing leaf #${selectedIndex} • current layer ${Math.max(activeLayer, 0)} / ${Math.max(layers.length - 1, 0)}`
               : "Select a leaf below to begin traversal."}
@@ -152,6 +152,7 @@ export default function MerklePage() {
               return (
                 <button
                   key={event.id}
+                  data-testid={`event-leaf-${index}`}
                   onClick={() => setSelectedIndex(index)}
                   className={`block w-full rounded-xl border p-3 text-left transition ${active ? "border-yellow-400/50 bg-yellow-400/10" : "border-white/10 bg-black/40 hover:border-yellow-400/40 hover:bg-black/50"}`}
                 >

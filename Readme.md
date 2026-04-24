@@ -16,3 +16,10 @@ This repository will contain:
 - offline deployment stack
 - Maataa UI
 - proof and status systems
+
+## Deploy
+
+- VPS + domain deploy guide: `deploy/vps/README.md`
+- Release gate: `deploy/vps/RELEASE_CHECKLIST.md`
+- Health endpoint: `/api/health`
+- Smoke verification: `deploy/vps/smoke.sh`
