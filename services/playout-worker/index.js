@@ -64,6 +64,26 @@ function newCorrelationId(prefix = "corr") {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function cloneRadioState() {
+  return {
+    trackIndex: radioState.trackIndex,
+    songIndex: radioState.songIndex,
+    adIndex: radioState.adIndex,
+    rjIndex: radioState.rjIndex,
+    tracksSinceAd: radioState.tracksSinceAd,
+    scheduledUnits: radioState.scheduledUnits
+  };
+}
+
+function restoreRadioState(snapshot) {
+  radioState.trackIndex = snapshot.trackIndex;
+  radioState.songIndex = snapshot.songIndex;
+  radioState.adIndex = snapshot.adIndex;
+  radioState.rjIndex = snapshot.rjIndex;
+  radioState.tracksSinceAd = snapshot.tracksSinceAd;
+  radioState.scheduledUnits = snapshot.scheduledUnits;
+}
+
 function getHemantSamvatGhatiMap(date = new Date()) {
   const epoch = Date.parse("1979-01-14T00:00:00.000Z");
   const elapsedMs = date.getTime() - epoch;
@@ -195,6 +215,31 @@ function selectNextTrack() {
   radioState.tracksSinceAd += 1;
 
   return songs[radioState.songIndex];
+}
+
+export function previewScheduledItems(count = 30) {
+  const limit = Math.max(1, Math.min(Number(count) || 30, 200));
+  const snapshot = cloneRadioState();
+
+  try {
+    return Array.from({ length: limit }).map((_, index) => {
+      const item = normalizeTrack(selectNextTrack());
+      return {
+        index: index + 1,
+        scheduledUnit: radioState.scheduledUnits,
+        id: item.id,
+        title: item.title,
+        kind: item.kind,
+        durationSec: item.durationSec,
+        transition: item.transition,
+        ttsText: item.ttsText,
+        hemantSamvatGhatiMap: item.hemantSamvatGhatiMap,
+        previewTrack: item.previewTrack
+      };
+    });
+  } finally {
+    restoreRadioState(snapshot);
+  }
 }
 
 export function createRadioEmitter() {
