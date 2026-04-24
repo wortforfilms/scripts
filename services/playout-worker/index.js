@@ -31,12 +31,20 @@ const radioState = {
   trackIndex: -1,
   songIndex: -1,
   adIndex: -1,
+  rjIndex: -1,
   currentTrackId: null,
   currentTrack: null,
   tracksSinceAd: 0,
   adEveryNTracks: 2,
   scheduledUnits: 0,
   ttsEveryUnits: 24,
+  aiRjEveryUnits: 4,
+  personality: {
+    name: "Maataa RJ",
+    tone: "warm, wise, poetic, futuristic",
+    languages: ["English", "Hindi", "Sanskrit transliteration"],
+    signature: "Vaigyaaniq dhvani, Maataa ke saath"
+  },
   lastEvent: null,
   logs: [],
   queue: fallbackTracks
@@ -74,6 +82,10 @@ function getHemantSamvatGhatiMap(date = new Date()) {
   };
 }
 
+function makeTtsUrl(text, lang = "en") {
+  return `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${lang}&q=${encodeURIComponent(text)}`;
+}
+
 function createHemantSamvatAnnouncementTrack() {
   const map = getHemantSamvatGhatiMap();
   const text = `Hemant Samvat day ${map.hemantSamvatDay}, ghati ${map.ghati}, pala ${map.pala}. Maataa radio time unit ${map.scheduledUnits}.`;
@@ -82,11 +94,37 @@ function createHemantSamvatAnnouncementTrack() {
     id: `tts-hemant-samvat-${Date.now()}`,
     title: `Hemant Samvat Ghati Announcement`,
     kind: "tts",
-    audioUrl: `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=en&q=${encodeURIComponent(text)}`,
+    audioUrl: makeTtsUrl(text),
     durationSec: 12,
     transition: "cut",
     ttsText: text,
     hemantSamvatGhatiMap: map
+  };
+}
+
+function createAiRjTrack(nextTrack = null) {
+  const map = getHemantSamvatGhatiMap();
+  const nextTitle = nextTrack?.title ?? "the next Maataa transmission";
+  const scripts = [
+    `Namaste. This is Maataa RJ. In Hemant Samvat day ${map.hemantSamvatDay}, ghati ${map.ghati}, we open the next wave: ${nextTitle}. Vaigyaaniq dhvani, Maataa ke saath.`,
+    `Dear listener, Maataa is aligning scheduler, proof, and radio. Coming next: ${nextTitle}. Shuddh, saarthak, vaigyaaniq pravah.`,
+    `Suno. The runtime is awake, the signal is clean, and the next sound is ${nextTitle}. Maataa RJ is with you.`
+  ];
+
+  radioState.rjIndex = (radioState.rjIndex + 1) % scripts.length;
+  const text = scripts[radioState.rjIndex];
+
+  return {
+    id: `ai-rj-${Date.now()}`,
+    title: "Maataa RJ Announcement",
+    kind: "ai-rj",
+    audioUrl: makeTtsUrl(text),
+    durationSec: 16,
+    transition: "cut",
+    ttsText: text,
+    personality: radioState.personality,
+    hemantSamvatGhatiMap: map,
+    previewTrack: nextTrack
   };
 }
 
@@ -122,6 +160,13 @@ function normalizeTrack(track) {
   };
 }
 
+function peekNextSong() {
+  const queue = radioState.queue.length ? radioState.queue : fallbackTracks;
+  const songs = queue.filter((item) => item.kind !== "ad" && item.kind !== "tts" && item.kind !== "ai-rj");
+  if (!songs.length) return queue[0];
+  return songs[(radioState.songIndex + 1) % songs.length];
+}
+
 function selectNextTrack() {
   radioState.scheduledUnits += 1;
 
@@ -129,9 +174,13 @@ function selectNextTrack() {
     return createHemantSamvatAnnouncementTrack();
   }
 
+  if (radioState.scheduledUnits > 0 && radioState.scheduledUnits % radioState.aiRjEveryUnits === 0) {
+    return createAiRjTrack(peekNextSong());
+  }
+
   const queue = radioState.queue.length ? radioState.queue : fallbackTracks;
   const ads = queue.filter((item) => item.kind === "ad");
-  const songs = queue.filter((item) => item.kind !== "ad" && item.kind !== "tts");
+  const songs = queue.filter((item) => item.kind !== "ad" && item.kind !== "tts" && item.kind !== "ai-rj");
 
   if (ads.length && radioState.tracksSinceAd >= radioState.adEveryNTracks) {
     radioState.tracksSinceAd = 0;
@@ -184,7 +233,9 @@ export function setNowPlaying(track, meta = {}) {
     kind: normalizedTrack.kind,
     transition: normalizedTrack.transition,
     ttsText: normalizedTrack.ttsText,
+    personality: normalizedTrack.personality,
     hemantSamvatGhatiMap: normalizedTrack.hemantSamvatGhatiMap,
+    previewTrack: normalizedTrack.previewTrack,
     ...meta
   });
 }
