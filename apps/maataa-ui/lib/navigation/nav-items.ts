@@ -10,7 +10,7 @@ export type NavItem = {
 
 export const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard", featureKey: "dashboard", section: "main" },
-  { label: "Scripts", href: "/verify", icon: "Languages", featureKey: "scriptCatalog", section: "main" },
+  { label: "Scripts", href: "/scripts", icon: "Languages", featureKey: "scriptCatalog", section: "main" },
   { label: "Runtime", href: "/runtime", icon: "Activity", featureKey: "runtimeStatus", section: "system" },
   { label: "Timeline", href: "/timeline", icon: "GitBranch", featureKey: "learningTimeline", section: "learn" },
   { label: "Proof", href: "/proof-inspector", icon: "ShieldCheck", featureKey: "proofInspector", section: "learn" },
