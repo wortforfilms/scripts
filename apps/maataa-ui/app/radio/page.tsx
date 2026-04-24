@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { connectEvents } from "@/lib/events";
 
-type NowPlayingEvent = {
+type RadioEvent = {
   id?: string;
   correlationId?: string;
   parentEventId?: string | null;
@@ -11,24 +11,71 @@ type NowPlayingEvent = {
   type?: string;
   time?: string;
   state?: string;
+  trackId?: string;
   track?: string;
+  audioUrl?: string;
+  durationSec?: number;
+  kind?: string;
+  transition?: string;
+  ttsText?: string;
+  hemantSamvatGhatiMap?: {
+    hemantSamvatDay?: number;
+    ghati?: number;
+    pala?: number;
+    scheduledUnits?: number;
+    unit24?: number;
+  };
 };
 
-export default function RadioPage() {
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
-  const [nowPlaying, setNowPlaying] = useState<NowPlayingEvent | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [sseConnected, setSseConnected] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+function stateBadge(connected: boolean) {
+  return connected
+    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+    : "border-yellow-500/20 bg-yellow-500/10 text-yellow-300";
+}
 
-  useEffect(() => {
-    fetch("/api/radio/config")
-      .then((res) => res.json())
-      .then((data) => {
-        setStreamUrl(data.streamUrl);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+function kindBadge(kind?: string) {
+  if (kind === "ad") return "border-amber-500/20 bg-amber-500/10 text-amber-300";
+  if (kind === "tts") return "border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-300";
+  return "border-cyan-500/20 bg-cyan-500/10 text-cyan-300";
+}
+
+export default function RadioPage() {
+  const [nowPlaying, setNowPlaying] = useState<RadioEvent | null>(null);
+  const [recentEvents, setRecentEvents] = useState<RadioEvent[]>([]);
+  const [sseConnected, setSseConnected] = useState(false);
+  const [timerLabel, setTimerLabel] = useState("idle");
+  const [autoMode, setAutoMode] = useState(true);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const durationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerNext = async () => {
+    await fetch("/api/radio/next", { method: "POST" }).catch(() => {});
+  };
+
+  const playEvent = (event: RadioEvent) => {
+    if (!event.audioUrl) return;
+
+    setNowPlaying(event);
+    setRecentEvents((current) => [event, ...current].slice(0, 8));
+
+    if (audioRef.current) {
+      audioRef.current.src = event.audioUrl;
+      audioRef.current.play().catch(() => {});
+    }
+
+    if (durationTimerRef.current) clearTimeout(durationTimerRef.current);
+
+    const durationSec = Math.max(1, Number(event.durationSec ?? 0));
+    setTimerLabel(durationSec ? `${durationSec}s scheduled` : "manual");
+
+    if (autoMode && durationSec > 0) {
+      durationTimerRef.current = setTimeout(() => {
+        setTimerLabel("auto-next");
+        triggerNext();
+      }, durationSec * 1000);
+    }
+  };
 
   useEffect(() => {
     const disconnect = connectEvents((raw) => {
@@ -36,76 +83,174 @@ export default function RadioPage() {
         const event = typeof raw === "string" ? JSON.parse(raw) : raw;
         setSseConnected(true);
 
-        if (event?.type === "radio.now_playing" || event?.type === "radio.queue_updated") {
-          setNowPlaying(event);
+        if (event?.type === "radio.now_playing" && event.audioUrl) {
+          playEvent(event);
         }
       } catch {}
     });
 
+    triggerNext();
+
     return () => {
       setSseConnected(false);
+      if (durationTimerRef.current) clearTimeout(durationTimerRef.current);
       disconnect();
     };
-  }, []);
+  }, [autoMode]);
+
+  const handleEnded = () => {
+    if (autoMode) triggerNext();
+  };
+
+  const ghati = nowPlaying?.hemantSamvatGhatiMap;
 
   return (
-    <div className="min-h-screen bg-black p-6 text-white">
-      <div className="mx-auto max-w-3xl space-y-6">
-        <div className="flex items-end justify-between gap-4">
+    <div className="min-h-screen overflow-hidden bg-black p-6 text-white">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.12),transparent_36%)]" />
+
+      <div className="relative mx-auto max-w-7xl space-y-6">
+        <div className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">📻 Maataa Radio</h1>
-            <p className="mt-2 text-white/60">
-              Live stream powered by Maataa runtime (scheduler → proof → radio).
+            <div className="text-xs uppercase tracking-[0.35em] text-yellow-300/70">Vaigyaaniq Broadcast Spine</div>
+            <h1 className="mt-2 text-4xl font-bold">📻 Maataa Radio</h1>
+            <p className="mt-2 max-w-2xl text-white/60">
+              Scheduler-driven autonomous radio with ads, Hemant Samvat TTS announcements, causality IDs, and duration-based auto-next.
             </p>
           </div>
-          <div className={`rounded-full border px-3 py-1 text-xs ${sseConnected ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300" : "border-yellow-500/20 bg-yellow-500/10 text-yellow-300"}`}>
-            {sseConnected ? "SSE Live" : "Waiting SSE"}
+
+          <div className="flex flex-wrap gap-2">
+            <div className={`rounded-full border px-4 py-2 text-xs ${stateBadge(sseConnected)}`}>
+              {sseConnected ? "SSE LIVE" : "WAITING SSE"}
+            </div>
+            <button
+              type="button"
+              onClick={() => setAutoMode((current) => !current)}
+              className={`rounded-full border px-4 py-2 text-xs ${autoMode ? "border-cyan-500/20 bg-cyan-500/10 text-cyan-300" : "border-white/10 bg-white/5 text-white/60"}`}
+            >
+              {autoMode ? "AUTO-NEXT ON" : "AUTO-NEXT OFF"}
+            </button>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          {loading ? (
-            <div className="text-white/60">Loading stream...</div>
-          ) : !streamUrl ? (
-            <div className="text-red-400">No stream URL configured</div>
-          ) : (
-            <div className="space-y-4">
-              <audio
-                ref={audioRef}
-                controls
-                autoPlay
-                className="w-full"
-                src={streamUrl}
-              />
-
-              <div className="break-all text-xs text-white/40">
-                Stream: {streamUrl}
+        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-3xl border border-white/10 bg-black/40 p-6 shadow-[0_0_80px_rgba(34,211,238,0.08)] backdrop-blur-xl">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <div className="text-sm text-white/45">Now Playing</div>
+                <div className="mt-1 text-3xl font-semibold text-white">
+                  {nowPlaying?.track ?? "Starting scheduler..."}
+                </div>
+              </div>
+              <div className={`rounded-full border px-3 py-1 text-xs ${kindBadge(nowPlaying?.kind)}`}>
+                {(nowPlaying?.kind ?? "idle").toUpperCase()}
               </div>
             </div>
-          )}
-        </div>
 
-        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-5">
-          <div className="text-sm text-white/50">Now Playing</div>
-          {nowPlaying ? (
-            <div className="mt-2 space-y-1">
-              <div className="text-xl font-semibold text-white">
-                {nowPlaying.track ?? nowPlaying.type ?? "Radio Event"}
-              </div>
-              <div className="text-xs text-white/50">
-                {nowPlaying.source ?? "radio"} • {nowPlaying.time ?? "live"}
-              </div>
-              <div className="break-all text-[11px] text-white/35">
-                correlation: {nowPlaying.correlationId ?? "—"}
+            <div className="relative mb-6 overflow-hidden rounded-3xl border border-cyan-500/20 bg-cyan-500/10 p-8">
+              <div className="absolute inset-0 opacity-30 [background:repeating-linear-gradient(90deg,rgba(255,255,255,0.18)_0_2px,transparent_2px_18px)]" />
+              <div className="relative flex h-40 items-center justify-center gap-2">
+                {Array.from({ length: 48 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="w-1 rounded-full bg-cyan-300/80 shadow-[0_0_12px_rgba(34,211,238,0.7)]"
+                    style={{ height: `${18 + ((index * 17) % 90)}px` }}
+                  />
+                ))}
               </div>
             </div>
-          ) : (
-            <div className="mt-2 text-white/40">Waiting for radio.now_playing event...</div>
-          )}
+
+            <audio ref={audioRef} controls autoPlay onEnded={handleEnded} className="w-full" />
+
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs text-white/40">Timer</div>
+                <div className="mt-1 font-medium text-cyan-300">{timerLabel}</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs text-white/40">Transition</div>
+                <div className="mt-1 font-medium text-white">{nowPlaying?.transition ?? "cut"}</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs text-white/40">Duration</div>
+                <div className="mt-1 font-medium text-white">{nowPlaying?.durationSec ?? "—"}s</div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={triggerNext}
+                className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-5 py-3 text-sm font-medium text-cyan-300 hover:bg-cyan-500/15"
+              >
+                Trigger Next
+              </button>
+              <button
+                type="button"
+                onClick={() => audioRef.current?.play().catch(() => {})}
+                className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white/70 hover:bg-white/10"
+              >
+                Resume Audio
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/10 p-5 backdrop-blur-xl">
+              <div className="text-sm text-yellow-200/70">Hemant Samvat Ghati Map</div>
+              {ghati ? (
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-2xl bg-black/30 p-3"><div className="text-white/40">Day</div><div className="text-xl font-semibold">{ghati.hemantSamvatDay}</div></div>
+                  <div className="rounded-2xl bg-black/30 p-3"><div className="text-white/40">Ghati</div><div className="text-xl font-semibold">{ghati.ghati}</div></div>
+                  <div className="rounded-2xl bg-black/30 p-3"><div className="text-white/40">Pala</div><div className="text-xl font-semibold">{ghati.pala}</div></div>
+                  <div className="rounded-2xl bg-black/30 p-3"><div className="text-white/40">Unit</div><div className="text-xl font-semibold">{ghati.scheduledUnits}</div></div>
+                </div>
+              ) : (
+                <div className="mt-3 text-sm text-white/45">TTS ghati map appears every 24 scheduled units.</div>
+              )}
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <div className="text-lg font-semibold">Scheduler Rules</div>
+                  <div className="text-sm text-white/45">Autonomous programming logic</div>
+                </div>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-3">🎵 2 songs → 📢 1 ad</div>
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-3">🕉️ TTS every 24 scheduled units</div>
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-3">⏱️ durationSec timer triggers auto-next</div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+              <div className="text-lg font-semibold">Causality</div>
+              <div className="mt-3 space-y-2 text-xs text-white/45">
+                <div className="break-all">correlation: {nowPlaying?.correlationId ?? "—"}</div>
+                <div className="break-all">parent: {nowPlaying?.parentEventId ?? "root"}</div>
+                <div>event: {nowPlaying?.type ?? "—"}</div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-white/50">
-          If no audio plays, ensure your stream is running. The UI now listens to <span className="text-cyan-300">/api/spine/events</span> directly for radio events.
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <div className="text-lg font-semibold">Recent Runtime Radio Events</div>
+              <div className="text-sm text-white/45">Latest now-playing decisions received from SSE</div>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {recentEvents.length ? recentEvents.map((event) => (
+              <div key={event.id ?? `${event.track}-${event.time}`} className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                <div className="text-sm font-medium">{event.track}</div>
+                <div className="mt-1 text-xs text-white/45">{event.kind} • {event.durationSec}s</div>
+              </div>
+            )) : (
+              <div className="text-sm text-white/45">Waiting for radio.now_playing events...</div>
+            )}
+          </div>
         </div>
       </div>
     </div>
