@@ -36,6 +36,8 @@ type PreviewItem = {
   durationSec?: number;
   transition?: string;
   ttsText?: string;
+  hemantSamvatGhatiMap?: Record<string, unknown>;
+  previewTrack?: Record<string, unknown>;
 };
 
 function stateBadge(connected: boolean) {
@@ -62,6 +64,7 @@ export default function RadioPage() {
   const [nowPlaying, setNowPlaying] = useState<RadioEvent | null>(null);
   const [recentEvents, setRecentEvents] = useState<RadioEvent[]>([]);
   const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
+  const [selectedPreview, setSelectedPreview] = useState<PreviewItem | null>(null);
   const [sseConnected, setSseConnected] = useState(false);
   const [timerLabel, setTimerLabel] = useState("idle");
   const [autoMode, setAutoMode] = useState(true);
@@ -73,6 +76,7 @@ export default function RadioPage() {
     const res = await fetch("/api/radio/preview?count=30");
     const data = await res.json();
     setPreviewItems(data.items || []);
+    setSelectedPreview((current) => current ?? data.items?.[0] ?? null);
   };
 
   const triggerNext = async () => {
@@ -150,11 +154,7 @@ export default function RadioPage() {
             <div className={`rounded-full border px-4 py-2 text-xs ${stateBadge(sseConnected)}`}>
               {sseConnected ? "SSE LIVE" : "WAITING SSE"}
             </div>
-            <button
-              type="button"
-              onClick={() => setAutoMode((current) => !current)}
-              className={`rounded-full border px-4 py-2 text-xs ${autoMode ? "border-cyan-500/20 bg-cyan-500/10 text-cyan-300" : "border-white/10 bg-white/5 text-white/60"}`}
-            >
+            <button type="button" onClick={() => setAutoMode((current) => !current)} className={`rounded-full border px-4 py-2 text-xs ${autoMode ? "border-cyan-500/20 bg-cyan-500/10 text-cyan-300" : "border-white/10 bg-white/5 text-white/60"}`}>
               {autoMode ? "AUTO-NEXT ON" : "AUTO-NEXT OFF"}
             </button>
           </div>
@@ -165,43 +165,24 @@ export default function RadioPage() {
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <div className="text-sm text-white/45">Now Playing</div>
-                <div className="mt-1 text-3xl font-semibold text-white">
-                  {nowPlaying?.track ?? "Starting scheduler..."}
-                </div>
+                <div className="mt-1 text-3xl font-semibold text-white">{nowPlaying?.track ?? "Starting scheduler..."}</div>
               </div>
-              <div className={`rounded-full border px-3 py-1 text-xs ${kindBadge(nowPlaying?.kind)}`}>
-                {(nowPlaying?.kind ?? "idle").toUpperCase()}
-              </div>
+              <div className={`rounded-full border px-3 py-1 text-xs ${kindBadge(nowPlaying?.kind)}`}>{(nowPlaying?.kind ?? "idle").toUpperCase()}</div>
             </div>
 
             <div className="relative mb-6 overflow-hidden rounded-3xl border border-cyan-500/20 bg-cyan-500/10 p-8">
               <div className="absolute inset-0 opacity-30 [background:repeating-linear-gradient(90deg,rgba(255,255,255,0.18)_0_2px,transparent_2px_18px)]" />
               <div className="relative flex h-40 items-center justify-center gap-2">
-                {Array.from({ length: 48 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="w-1 rounded-full bg-cyan-300/80 shadow-[0_0_12px_rgba(34,211,238,0.7)]"
-                    style={{ height: `${18 + ((index * 17) % 90)}px` }}
-                  />
-                ))}
+                {Array.from({ length: 48 }).map((_, index) => (<div key={index} className="w-1 rounded-full bg-cyan-300/80 shadow-[0_0_12px_rgba(34,211,238,0.7)]" style={{ height: `${18 + ((index * 17) % 90)}px` }} />))}
               </div>
             </div>
 
             <audio ref={audioRef} controls autoPlay onEnded={handleEnded} className="w-full" />
 
             <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-white/40">Timer</div>
-                <div className="mt-1 font-medium text-cyan-300">{timerLabel}</div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-white/40">Transition</div>
-                <div className="mt-1 font-medium text-white">{nowPlaying?.transition ?? "cut"}</div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-white/40">Duration</div>
-                <div className="mt-1 font-medium text-white">{nowPlaying?.durationSec ?? "—"}s</div>
-              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><div className="text-xs text-white/40">Timer</div><div className="mt-1 font-medium text-cyan-300">{timerLabel}</div></div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><div className="text-xs text-white/40">Transition</div><div className="mt-1 font-medium text-white">{nowPlaying?.transition ?? "cut"}</div></div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><div className="text-xs text-white/40">Duration</div><div className="mt-1 font-medium text-white">{nowPlaying?.durationSec ?? "—"}s</div></div>
             </div>
 
             <div className="mt-5 flex flex-wrap gap-3">
@@ -214,70 +195,32 @@ export default function RadioPage() {
           <div className="space-y-6">
             <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/10 p-5 backdrop-blur-xl">
               <div className="text-sm text-yellow-200/70">Hemant Samvat Ghati Map</div>
-              {ghati ? (
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-2xl bg-black/30 p-3"><div className="text-white/40">Day</div><div className="text-xl font-semibold">{ghati.hemantSamvatDay}</div></div>
-                  <div className="rounded-2xl bg-black/30 p-3"><div className="text-white/40">Ghati</div><div className="text-xl font-semibold">{ghati.ghati}</div></div>
-                  <div className="rounded-2xl bg-black/30 p-3"><div className="text-white/40">Pala</div><div className="text-xl font-semibold">{ghati.pala}</div></div>
-                  <div className="rounded-2xl bg-black/30 p-3"><div className="text-white/40">Unit</div><div className="text-xl font-semibold">{ghati.scheduledUnits}</div></div>
-                </div>
-              ) : (
-                <div className="mt-3 text-sm text-white/45">TTS ghati map appears every 24 scheduled units.</div>
-              )}
+              {ghati ? (<div className="mt-4 grid grid-cols-2 gap-3 text-sm"><div className="rounded-2xl bg-black/30 p-3"><div className="text-white/40">Day</div><div className="text-xl font-semibold">{ghati.hemantSamvatDay}</div></div><div className="rounded-2xl bg-black/30 p-3"><div className="text-white/40">Ghati</div><div className="text-xl font-semibold">{ghati.ghati}</div></div><div className="rounded-2xl bg-black/30 p-3"><div className="text-white/40">Pala</div><div className="text-xl font-semibold">{ghati.pala}</div></div><div className="rounded-2xl bg-black/30 p-3"><div className="text-white/40">Unit</div><div className="text-xl font-semibold">{ghati.scheduledUnits}</div></div></div>) : (<div className="mt-3 text-sm text-white/45">TTS ghati map appears every 24 scheduled units.</div>)}
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-              <div className="text-lg font-semibold">Scheduler Rules</div>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-3">🎵 2 songs → 📢 1 ad</div>
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-3">🎙️ AI RJ every 4 scheduled units</div>
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-3">🕉️ TTS every 24 scheduled units</div>
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-3">⏱️ durationSec timer triggers auto-next</div>
-              </div>
-            </div>
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl"><div className="text-lg font-semibold">Scheduler Rules</div><div className="mt-3 space-y-2 text-sm"><div className="rounded-2xl border border-white/10 bg-black/30 p-3">🎵 2 songs → 📢 1 ad</div><div className="rounded-2xl border border-white/10 bg-black/30 p-3">🎙️ AI RJ every 4 scheduled units</div><div className="rounded-2xl border border-white/10 bg-black/30 p-3">🕉️ TTS every 24 scheduled units</div><div className="rounded-2xl border border-white/10 bg-black/30 p-3">⏱️ durationSec timer triggers auto-next</div></div></div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-              <div className="text-lg font-semibold">Causality</div>
-              <div className="mt-3 space-y-2 text-xs text-white/45">
-                <div className="break-all">correlation: {nowPlaying?.correlationId ?? "—"}</div>
-                <div className="break-all">parent: {nowPlaying?.parentEventId ?? "root"}</div>
-                <div>event: {nowPlaying?.type ?? "—"}</div>
-              </div>
-            </div>
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl"><div className="text-lg font-semibold">Causality</div><div className="mt-3 space-y-2 text-xs text-white/45"><div className="break-all">correlation: {nowPlaying?.correlationId ?? "—"}</div><div className="break-all">parent: {nowPlaying?.parentEventId ?? "root"}</div><div>event: {nowPlaying?.type ?? "—"}</div></div></div>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <div className="text-lg font-semibold">Visual Scheduler Preview</div>
-              <div className="text-sm text-white/45">Next 30 non-mutating scheduled items from /api/radio/preview</div>
-            </div>
-          </div>
-          <div className="overflow-x-auto pb-2">
-            <div className="flex min-w-max items-start gap-3">
-              {previewItems.map((item) => (
-                <div key={`${item.index}-${item.id}`} className="flex items-center gap-3">
-                  <div className={`w-44 rounded-2xl border p-4 ${kindBadge(item.kind)}`}>
-                    <div className="text-2xl">{nodeLabel(item.kind)}</div>
-                    <div className="mt-2 text-xs uppercase tracking-wide opacity-75">#{item.index} • unit {item.scheduledUnit}</div>
-                    <div className="mt-1 truncate text-sm font-semibold text-white">{item.title}</div>
-                    <div className="mt-1 text-xs opacity-75">{item.kind} • {item.durationSec}s</div>
-                  </div>
-                  {item.index < previewItems.length ? <div className="h-px w-8 bg-white/20" /> : null}
-                </div>
-              ))}
+        <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+            <div className="mb-4 flex items-center justify-between"><div><div className="text-lg font-semibold">Visual Scheduler Preview</div><div className="text-sm text-white/45">Click any node to inspect its full payload</div></div></div>
+            <div className="overflow-x-auto pb-2"><div className="flex min-w-max items-start gap-3">
+              {previewItems.map((item) => (<div key={`${item.index}-${item.id}`} className="flex items-center gap-3"><button type="button" onClick={() => setSelectedPreview(item)} className={`w-44 rounded-2xl border p-4 text-left transition hover:scale-[1.02] ${kindBadge(item.kind)} ${selectedPreview?.index === item.index ? "ring-2 ring-white/40" : ""}`}><div className="text-2xl">{nodeLabel(item.kind)}</div><div className="mt-2 text-xs uppercase tracking-wide opacity-75">#{item.index} • unit {item.scheduledUnit}</div><div className="mt-1 truncate text-sm font-semibold text-white">{item.title}</div><div className="mt-1 text-xs opacity-75">{item.kind} • {item.durationSec}s</div></button>{item.index < previewItems.length ? <div className="h-px w-8 bg-white/20" /> : null}</div>))}
               {!previewItems.length ? <div className="text-sm text-white/45">Preview loading...</div> : null}
-            </div>
+            </div></div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-black/40 p-5 backdrop-blur-xl">
+            <div className="text-lg font-semibold">Node Inspector</div>
+            <div className="mt-1 text-sm text-white/45">Full scheduler payload</div>
+            {selectedPreview ? (<div className="mt-4 space-y-4"><div className={`rounded-2xl border p-4 ${kindBadge(selectedPreview.kind)}`}><div className="text-2xl">{nodeLabel(selectedPreview.kind)}</div><div className="mt-2 text-xl font-semibold text-white">{selectedPreview.title}</div><div className="mt-1 text-xs opacity-75">#{selectedPreview.index} • unit {selectedPreview.scheduledUnit} • {selectedPreview.kind}</div></div>{selectedPreview.ttsText ? <div className="rounded-2xl border border-violet-500/20 bg-violet-500/10 p-4"><div className="text-sm text-violet-200/70">Script</div><div className="mt-2 text-sm text-white/80">{selectedPreview.ttsText}</div></div> : null}<pre className="max-h-[360px] overflow-auto rounded-2xl border border-white/10 bg-black/60 p-4 text-xs text-cyan-100">{JSON.stringify(selectedPreview, null, 2)}</pre></div>) : (<div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/45">Select a timeline node.</div>)}
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-          <div className="mb-4 flex items-center justify-between"><div><div className="text-lg font-semibold">Recent Runtime Radio Events</div><div className="text-sm text-white/45">Latest now-playing decisions received from SSE</div></div></div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {recentEvents.length ? recentEvents.map((event) => (<div key={event.id ?? `${event.track}-${event.time}`} className="rounded-2xl border border-white/10 bg-black/30 p-4"><div className="text-sm font-medium">{event.track}</div><div className="mt-1 text-xs text-white/45">{event.kind} • {event.durationSec}s</div></div>)) : (<div className="text-sm text-white/45">Waiting for radio.now_playing events...</div>)}
-          </div>
-        </div>
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl"><div className="mb-4 flex items-center justify-between"><div><div className="text-lg font-semibold">Recent Runtime Radio Events</div><div className="text-sm text-white/45">Latest now-playing decisions received from SSE</div></div></div><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{recentEvents.length ? recentEvents.map((event) => (<div key={event.id ?? `${event.track}-${event.time}`} className="rounded-2xl border border-white/10 bg-black/30 p-4"><div className="text-sm font-medium">{event.track}</div><div className="mt-1 text-xs text-white/45">{event.kind} • {event.durationSec}s</div></div>)) : (<div className="text-sm text-white/45">Waiting for radio.now_playing events...</div>)}</div></div>
       </div>
     </div>
   );
