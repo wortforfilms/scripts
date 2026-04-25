@@ -7,6 +7,7 @@ import { verifiedScriptsSeed } from "../../../packages/scripts-data/src/verified
 import { assertGlyphQa } from "../lib/glyph-qa";
 import { buildReleaseMatrix } from "../lib/release-matrix";
 import { createSessionTokenForTests, verifySessionToken } from "../lib/auth/session";
+import { calculateSplits } from "../lib/revenue/calculate-splits";
 
 describe("launch validation: auth provider", () => {
   it("accepts signed production session JWTs and rejects tampering", async () => {
@@ -31,13 +32,27 @@ describe("launch validation: dataset and glyph QA", () => {
     const result = runDatasetQa([
       {
         ...verifiedScriptsSeed[0],
-        id: "fake-script",
-        slug: "fake-script",
-        sources: ["AI generated placeholder"]
+      id: "fake-script",
+      slug: "fake-script",
+      sources: ["AI generated placeholder"]
       }
     ]);
     expect(result.ok).toBe(false);
     expect(result.errors.join("\n")).toContain("unverifiable/generated");
+  });
+
+  it("fails when unicodeSupported records do not provide ranges", () => {
+    const result = runDatasetQa([
+      {
+        ...verifiedScriptsSeed[0],
+        id: "missing-ranges",
+        slug: "missing-ranges",
+        unicodeSupported: true,
+        unicodeRanges: []
+      }
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.errors.join("\n")).toContain("unicodeRanges are required");
   });
 
   it("passes current verified/partial script seed QA", () => {
@@ -61,6 +76,7 @@ describe("launch validation: Razorpay local test-mode E2E", () => {
   it("creates order, verifies webhook signature, marks PAID, and unlocks access only after verified webhook", async () => {
     const { runtimeDb } = await import("../lib/runtime-db");
     const { ensureCatalogDb, createPendingOrder, listUserAccess } = await import("../lib/catalog-db");
+    const { listRevenueLedger } = await import("../lib/revenue/create-ledger");
     const { POST: webhookPost } = await import("../app/api/payments/razorpay/webhook/route");
     await ensureCatalogDb();
 
@@ -102,7 +118,7 @@ describe("launch validation: Razorpay local test-mode E2E", () => {
     const validResponse = await webhookPost(
       new Request("https://scripts.vaigyaaniq.info/api/payments/razorpay/webhook", {
         method: "POST",
-        headers: { "x-razorpay-signature": signature },
+        headers: { "x-razorpay-signature": signature, "x-razorpay-event-id": "evt_launch" },
         body
       })
     );
@@ -110,7 +126,38 @@ describe("launch validation: Razorpay local test-mode E2E", () => {
     await expect(listUserAccess("user_launch")).resolves.toEqual([
       expect.objectContaining({ productId: "prod_launch", orderId: expect.any(String) })
     ]);
+    await expect(listRevenueLedger(order.id)).resolves.toEqual([
+      expect.objectContaining({ orderId: order.id, party: "PLATFORM", basisPoints: 10000, transferStatus: "PENDING_ADMIN_APPROVAL" })
+    ]);
+
+    const duplicateResponse = await webhookPost(
+      new Request("https://scripts.vaigyaaniq.info/api/payments/razorpay/webhook", {
+        method: "POST",
+        headers: { "x-razorpay-signature": signature, "x-razorpay-event-id": "evt_launch" },
+        body
+      })
+    );
+    expect(duplicateResponse.status).toBe(200);
+    expect(await duplicateResponse.json()).toMatchObject({ result: { duplicate: true } });
   }, 20_000);
+});
+
+describe("launch validation: revenue splits", () => {
+  it("rejects split rules that do not total 10000 basis points", () => {
+    expect(() => calculateSplits(1000, [{ party: "PLATFORM", accountId: null, basisPoints: 9000 }])).toThrow("10000");
+  });
+
+  it("calculates ledger amounts from basis points", () => {
+    expect(
+      calculateSplits(1001, [
+        { party: "PLATFORM", accountId: null, basisPoints: 5000 },
+        { party: "CREATOR", accountId: "acct_creator", basisPoints: 5000 }
+      ])
+    ).toEqual([
+      { party: "PLATFORM", accountId: null, basisPoints: 5000, amountInPaise: 500 },
+      { party: "CREATOR", accountId: "acct_creator", basisPoints: 5000, amountInPaise: 501 }
+    ]);
+  });
 });
 
 describe("launch validation: release matrix", () => {

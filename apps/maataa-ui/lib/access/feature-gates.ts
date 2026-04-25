@@ -59,7 +59,14 @@ const premiumFeatures: FeatureKey[] = [
 
 const researcherFeatures: FeatureKey[] = ["runtimeTimeline", "runtimeStatus", "spineEvents"];
 
-const reviewerFeatures: FeatureKey[] = ["adminCatalog", "adminSkuReview", "adminScriptVerification"];
+const reviewerFeatures: FeatureKey[] = [
+  "adminCatalog",
+  "adminSkuReview",
+  "adminScriptVerification",
+  "adminDatasetQa",
+  "adminGlyphQa",
+  "adminUnicodeHeatmap"
+];
 
 const adminFeatures: FeatureKey[] = [
   "adminOrders",
@@ -68,7 +75,9 @@ const adminFeatures: FeatureKey[] = [
   "adminSkuSubmitReview",
   "adminSkuApprove",
   "adminSkuPublish",
-  "adminSkuArchive"
+  "adminSkuArchive",
+  "adminFinance",
+  "adminPartnerships"
 ];
 
 function configFor(key: FeatureKey): FeatureGateConfig {
@@ -128,6 +137,11 @@ export const featureGates: Record<FeatureKey, FeatureGateConfig> = {
   adminOrders: configFor("adminOrders"),
   adminSpine: configFor("adminSpine"),
   adminFeatures: configFor("adminFeatures"),
+  adminDatasetQa: configFor("adminDatasetQa"),
+  adminGlyphQa: configFor("adminGlyphQa"),
+  adminUnicodeHeatmap: configFor("adminUnicodeHeatmap"),
+  adminFinance: configFor("adminFinance"),
+  adminPartnerships: configFor("adminPartnerships"),
   adminSkuGenerate: configFor("adminSkuGenerate"),
   adminSkuSubmitReview: configFor("adminSkuSubmitReview"),
   adminSkuApprove: configFor("adminSkuApprove"),

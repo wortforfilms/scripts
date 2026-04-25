@@ -1,13 +1,19 @@
+import { requireFeature, routeError } from "@/lib/auth";
 import { prepareIpfsPublish } from "@/lib/ipfs";
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  const root = body.merkleRoot;
+  try {
+    await requireFeature("proofInspector");
+    const body = await req.json();
+    const root = body.merkleRoot;
 
-  const record = await prepareIpfsPublish(root);
+    const record = await prepareIpfsPublish(root);
 
-  return Response.json({
-    ...record,
-    note: "Production IPFS publish scaffold. Replace with actual upload implementation."
-  });
+    return Response.json({
+      ...record,
+      note: "Production IPFS publish scaffold. Replace with actual upload implementation."
+    });
+  } catch (error) {
+    return routeError(error);
+  }
 }

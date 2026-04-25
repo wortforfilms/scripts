@@ -257,6 +257,33 @@ export const toolRegistry = [
     description: "Verify script records and glyph policy."
   },
   {
+    id: "adminDatasetQa",
+    name: "Dataset QA",
+    category: "Admin",
+    phase: "MVP",
+    route: "/admin/dataset-qa",
+    featureKey: "adminDatasetQa",
+    description: "Block public preview when records miss sources, statuses, system type, or Unicode metadata."
+  },
+  {
+    id: "adminGlyphQa",
+    name: "Glyph QA",
+    category: "Admin",
+    phase: "MVP",
+    route: "/admin/glyph-qa",
+    featureKey: "adminGlyphQa",
+    description: "Run glyph and font QA and queue review when rendering policy fails."
+  },
+  {
+    id: "adminUnicodeHeatmap",
+    name: "Unicode Heatmap",
+    category: "Admin",
+    phase: "MVP",
+    route: "/admin/unicode-heatmap",
+    featureKey: "adminUnicodeHeatmap",
+    description: "Review Unicode coverage, pass counts, and fail counts for launch gates."
+  },
+  {
     id: "adminUnicode",
     name: "Unicode Admin",
     category: "Admin",
@@ -273,6 +300,24 @@ export const toolRegistry = [
     route: "/admin/orders",
     featureKey: "adminOrders",
     description: "Audit orders and payment verification status."
+  },
+  {
+    id: "adminFinance",
+    name: "Finance Ledger",
+    category: "Admin",
+    phase: "MVP",
+    route: "/admin/finance",
+    featureKey: "adminFinance",
+    description: "Review paid orders, verified payments, webhook idempotency, access unlocks, and split ledger status."
+  },
+  {
+    id: "adminPartnerships",
+    name: "Partnerships",
+    category: "Admin",
+    phase: "MVP",
+    route: "/admin/partnerships",
+    featureKey: "adminPartnerships",
+    description: "Review investor, sponsor, creator, and affiliate intake from public journeys."
   },
   {
     id: "adminSpine",

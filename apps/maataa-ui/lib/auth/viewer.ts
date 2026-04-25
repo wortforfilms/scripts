@@ -1,9 +1,13 @@
 import { cookies } from "next/headers";
-import type { AccessViewer, UserPlan, UserRole } from "../access/types";
+import type { AccessViewer, AccountRole, AccountType, UserPlan, UserRole } from "../access/types";
 import { SESSION_COOKIE_NAME, verifySessionToken } from "./session";
 
 export const guestViewer: AccessViewer = {
   id: null,
+  userId: null,
+  accountId: null,
+  accountType: null,
+  accountRole: null,
   role: "GUEST",
   plan: "FREE",
   permissions: [],
@@ -20,11 +24,25 @@ export function parsePlan(value: string | undefined | null): UserPlan {
   return "FREE";
 }
 
+export function parseAccountType(value: string | undefined | null): AccountType | null {
+  if (value === "INDIVIDUAL" || value === "COMPANY" || value === "ORGANIZATION" || value === "GOVERNMENT") return value;
+  return null;
+}
+
+export function parseAccountRole(value: string | undefined | null): AccountRole | null {
+  if (value === "OWNER" || value === "ADMIN" || value === "REVIEWER" || value === "MEMBER" || value === "BILLING") return value;
+  return null;
+}
+
 export function viewerFromCookieValues(input: { userId?: string | null; role?: string | null; plan?: string | null }): AccessViewer {
   const role = parseRole(input.role);
   const id = input.userId ?? null;
   return {
     id,
+    userId: id,
+    accountId: id ? `acct_${id}` : null,
+    accountType: id ? "INDIVIDUAL" : null,
+    accountRole: id ? "OWNER" : null,
     role: id ? (role === "GUEST" ? "USER" : role) : "GUEST",
     plan: id ? parsePlan(input.plan) : "FREE",
     permissions: [],

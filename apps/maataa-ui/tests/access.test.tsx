@@ -29,10 +29,21 @@ import { AppSidebar } from "../components/layout/AppSidebar";
 import { FeatureGate } from "../components/access/FeatureGate";
 import { middleware } from "../middleware";
 
-const guest: AccessViewer = { id: null, role: "GUEST", plan: "FREE", permissions: [], isLoggedIn: false };
-const freeUser: AccessViewer = { id: "user_1", role: "USER", plan: "FREE", permissions: [], isLoggedIn: true };
-const premiumUser: AccessViewer = { id: "user_2", role: "USER", plan: "PREMIUM", permissions: [], isLoggedIn: true };
-const admin: AccessViewer = { id: "admin_1", role: "ADMIN", plan: "ENTERPRISE", permissions: ["catalog-admin"], isLoggedIn: true };
+function viewer(input: Partial<AccessViewer> & Pick<AccessViewer, "id" | "role" | "plan" | "isLoggedIn">): AccessViewer {
+  return {
+    userId: input.id,
+    accountId: input.id ? `acct_${input.id}` : null,
+    accountType: input.id ? "INDIVIDUAL" : null,
+    accountRole: input.id ? "OWNER" : null,
+    permissions: [],
+    ...input
+  };
+}
+
+const guest = viewer({ id: null, role: "GUEST", plan: "FREE", isLoggedIn: false });
+const freeUser = viewer({ id: "user_1", role: "USER", plan: "FREE", permissions: [], isLoggedIn: true });
+const premiumUser = viewer({ id: "user_2", role: "USER", plan: "PREMIUM", permissions: [], isLoggedIn: true });
+const admin = viewer({ id: "admin_1", role: "ADMIN", plan: "ENTERPRISE", permissions: ["catalog-admin"], isLoggedIn: true });
 
 describe("access engine", () => {
   it("guest cannot access protected routes", () => {

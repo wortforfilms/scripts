@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireFeature, requireUser, routeError } from "../../../../lib/auth";
 import { createPendingOrder, quoteSkus } from "../../../../lib/catalog-db";
 import { parseCheckoutRequest } from "../../../../lib/forms/schemas";
-import { createRazorpayTestOrder } from "../../../../lib/razorpay";
+import { createRazorpayTestOrder } from "../../../../lib/payments/razorpay";
 
 export async function POST(request: Request) {
   try {

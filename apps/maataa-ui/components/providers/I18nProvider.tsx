@@ -26,6 +26,7 @@ type TranslationKey =
   | "products"
   | "courses"
   | "tools"
+  | "partners"
   | "timeline"
   | "about"
   | "cart"
@@ -46,6 +47,7 @@ const translations: Record<LanguageCode, Record<TranslationKey, string>> = {
     products: "Products",
     courses: "Courses",
     tools: "Tools",
+    partners: "Partners",
     timeline: "Timeline",
     about: "About",
     cart: "Cart",
@@ -65,6 +67,7 @@ const translations: Record<LanguageCode, Record<TranslationKey, string>> = {
     products: "उत्पाद",
     courses: "पाठ्यक्रम",
     tools: "उपकरण",
+    partners: "साझेदार",
     timeline: "समयरेखा",
     about: "परिचय",
     cart: "कार्ट",
@@ -84,6 +87,7 @@ const translations: Record<LanguageCode, Record<TranslationKey, string>> = {
     products: "उत्पादाः",
     courses: "पाठाः",
     tools: "साधनानि",
+    partners: "भागिनः",
     timeline: "कालरेखा",
     about: "परिचयः",
     cart: "कार्ट",
@@ -103,6 +107,7 @@ const translations: Record<LanguageCode, Record<TranslationKey, string>> = {
     products: "தயாரிப்புகள்",
     courses: "பாடங்கள்",
     tools: "கருவிகள்",
+    partners: "கூட்டாளர்கள்",
     timeline: "காலவரிசை",
     about: "அறிமுகம்",
     cart: "கார்ட்",
@@ -122,6 +127,7 @@ const translations: Record<LanguageCode, Record<TranslationKey, string>> = {
     products: "পণ্য",
     courses: "কোর্স",
     tools: "টুলস",
+    partners: "পার্টনার",
     timeline: "টাইমলাইন",
     about: "পরিচিতি",
     cart: "কার্ট",
@@ -141,6 +147,7 @@ const translations: Record<LanguageCode, Record<TranslationKey, string>> = {
     products: "المنتجات",
     courses: "الدورات",
     tools: "الأدوات",
+    partners: "الشركاء",
     timeline: "الخط الزمني",
     about: "حول",
     cart: "السلة",

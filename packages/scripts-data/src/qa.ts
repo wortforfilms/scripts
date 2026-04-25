@@ -16,6 +16,10 @@ export function runDatasetQa(scripts: ScriptRecord[]): DatasetQaResult {
   }
 
   for (const script of scripts) {
+    if (!script.systemType) errors.push(`${script.id}: systemType is required`);
+    if (script.unicodeSupported && script.unicodeRanges.length === 0) {
+      errors.push(`${script.id}: unicodeRanges are required when unicodeSupported is true`);
+    }
     if (!script.verificationStatus) errors.push(`${script.id}: verificationStatus is required`);
     if (script.sources.some((source) => suspectSourcePatterns.some((pattern) => pattern.test(source)))) {
       errors.push(`${script.id}: source list contains unverifiable/generated wording`);

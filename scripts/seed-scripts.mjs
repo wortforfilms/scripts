@@ -1,9 +1,11 @@
-import { createClient } from "@libsql/client";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
+
+const requireFromApp = createRequire(new URL("../apps/maataa-ui/package.json", import.meta.url));
+const { createClient } = requireFromApp("@libsql/client");
 
 const databaseUrl = process.env.DATABASE_URL ?? process.env.RUNTIME_DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL or RUNTIME_DATABASE_URL is required");
@@ -17,6 +19,8 @@ writeFileSync(
       target: "ES2022",
       module: "CommonJS",
       moduleResolution: "Node",
+      resolveJsonModule: true,
+      esModuleInterop: true,
       strict: true,
       skipLibCheck: true,
       outDir: join(buildDir, "dist")
@@ -24,7 +28,7 @@ writeFileSync(
     include: [join(process.cwd(), "packages", "scripts-data", "src", "**", "*.ts")]
   })
 );
-execFileSync("pnpm", ["exec", "tsc", "-p", tsconfigPath], { stdio: "inherit" });
+execFileSync("pnpm", ["--dir", "apps/maataa-ui", "exec", "tsc", "-p", tsconfigPath], { stdio: "inherit" });
 const require = createRequire(import.meta.url);
 const { validateScriptsSeed } = require(join(buildDir, "dist", "validate-scripts.js"));
 const { verifiedScriptsSeed } = require(join(buildDir, "dist", "verified-scripts.seed.js"));

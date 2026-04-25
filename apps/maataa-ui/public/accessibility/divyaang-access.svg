@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" role="img" aria-labelledby="title desc">
+  <title id="title">Divyaang accessible script learning workspace</title>
+  <desc id="desc">A high contrast illustration showing accessible reading, audio, keyboard navigation, captions, and multilingual script study.</desc>
+  <rect width="960" height="560" rx="28" fill="#071018"/>
+  <rect x="44" y="44" width="872" height="472" rx="22" fill="#0f1b26" stroke="#facc15" stroke-width="4"/>
+  <circle cx="142" cy="132" r="46" fill="#facc15"/>
+  <path d="M128 132c18-24 40-24 58 0-18 24-40 24-58 0Z" fill="#071018"/>
+  <circle cx="157" cy="132" r="9" fill="#facc15"/>
+  <rect x="232" y="88" width="264" height="42" rx="10" fill="#f8fafc"/>
+  <rect x="232" y="154" width="360" height="28" rx="8" fill="#cbd5e1"/>
+  <rect x="232" y="204" width="318" height="28" rx="8" fill="#cbd5e1"/>
+  <rect x="232" y="254" width="386" height="28" rx="8" fill="#cbd5e1"/>
+  <g transform="translate(110 260)">
+    <rect width="92" height="92" rx="18" fill="#102b3d" stroke="#38bdf8" stroke-width="4"/>
+    <path d="M28 36a18 18 0 1 1 36 0v22a18 18 0 1 1-36 0V36Z" fill="none" stroke="#38bdf8" stroke-width="7"/>
+    <path d="M24 76h44" stroke="#38bdf8" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(110 380)">
+    <rect width="92" height="92" rx="18" fill="#2b1c37" stroke="#fb7185" stroke-width="4"/>
+    <path d="M24 34h44M24 58h44" stroke="#fb7185" stroke-width="8" stroke-linecap="round"/>
+    <path d="M28 72h34" stroke="#fb7185" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(670 94)">
+    <rect width="166" height="112" rx="18" fill="#0b1220" stroke="#facc15" stroke-width="4"/>
+    <path d="M38 74h90M38 44h58" stroke="#facc15" stroke-width="8" stroke-linecap="round"/>
+    <path d="M128 42l18 18-18 18" fill="none" stroke="#facc15" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g transform="translate(670 250)">
+    <rect width="166" height="112" rx="18" fill="#07251f" stroke="#34d399" stroke-width="4"/>
+    <path d="M38 74h90M38 44h90" stroke="#34d399" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="128" cy="44" r="12" fill="#34d399"/>
+  </g>
+  <g transform="translate(670 406)">
+    <rect width="166" height="66" rx="18" fill="#111827" stroke="#ffffff" stroke-width="4"/>
+    <path d="M34 34h98" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <text x="232" y="124" fill="#071018" font-family="Arial, sans-serif" font-size="28" font-weight="700">Read, hear, navigate, learn</text>
+  <text x="232" y="354" fill="#facc15" font-family="Arial, sans-serif" font-size="46" font-weight="700">अ A 𐡀 தமிழ்</text>
+  <text x="232" y="414" fill="#ffffff" font-family="Arial, sans-serif" font-size="24">Accessible by design for Divyaang users</text>
+</svg>

@@ -1,9 +1,12 @@
-import type { AccessViewer, UserPlan, UserRole } from "../access/types";
+import type { AccessViewer, AccountRole, AccountType, UserPlan, UserRole } from "../access/types";
 
 export const SESSION_COOKIE_NAME = "maataa_session";
 
 type SessionPayload = {
   sub: string;
+  accountId?: string;
+  accountType?: AccountType;
+  accountRole?: AccountRole;
   role?: UserRole;
   plan?: UserPlan;
   permissions?: string[];
@@ -11,6 +14,8 @@ type SessionPayload = {
   iss?: string;
   aud?: string;
 };
+
+export type CreateSessionPayload = SessionPayload;
 
 function base64UrlEncode(bytes: Uint8Array | string) {
   const binary = typeof bytes === "string" ? bytes : String.fromCharCode(...bytes);
@@ -43,6 +48,10 @@ function safeEqual(a: string, b: string) {
 function normalizePayload(payload: SessionPayload): AccessViewer {
   return {
     id: payload.sub,
+    userId: payload.sub,
+    accountId: payload.accountId ?? null,
+    accountType: payload.accountType ?? null,
+    accountRole: payload.accountRole ?? null,
     role: payload.role ?? "USER",
     plan: payload.plan ?? "FREE",
     permissions: payload.permissions ?? [],
@@ -69,9 +78,21 @@ export async function verifySessionToken(token: string | undefined, secret = pro
   return normalizePayload(payload);
 }
 
-export async function createSessionTokenForTests(payload: SessionPayload, secret: string) {
+export async function createSessionToken(payload: SessionPayload, secret = process.env.AUTH_SESSION_SECRET) {
+  if (!secret) throw new Error("AUTH_SESSION_SECRET is required to create a session");
   const header = base64UrlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const body = base64UrlEncode(JSON.stringify(payload));
+  const body = base64UrlEncode(
+    JSON.stringify({
+      ...payload,
+      exp: payload.exp ?? Math.floor(Date.now() / 1000) + 60 * 60 * 12,
+      iss: payload.iss ?? process.env.AUTH_SESSION_ISSUER,
+      aud: payload.aud ?? process.env.AUTH_SESSION_AUDIENCE
+    })
+  );
   const signature = base64UrlEncode(await hmacSha256(`${header}.${body}`, secret));
   return `${header}.${body}.${signature}`;
+}
+
+export async function createSessionTokenForTests(payload: SessionPayload, secret: string) {
+  return createSessionToken(payload, secret);
 }

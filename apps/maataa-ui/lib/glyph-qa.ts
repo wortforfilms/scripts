@@ -1,10 +1,12 @@
 import { existsSync } from "fs";
 import { join } from "path";
+import { recordFontQaRun } from "./catalog-db";
 import { scriptFontMap } from "./script-font-map";
 import { verifiedScriptsSeed } from "./script-data";
 
 export type GlyphQaResult = {
   ok: boolean;
+  checkedCount: number;
   errors: string[];
 };
 
@@ -25,11 +27,17 @@ export function runGlyphQa(publicDir = join(process.cwd(), "public")): GlyphQaRe
     if (!existsSync(assetPath)) errors.push(`${script.id}: fallback glyph asset missing at ${script.fallbackGlyphAsset}`);
   }
 
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, checkedCount: verifiedScriptsSeed.length, errors };
 }
 
 export function assertGlyphQa(publicDir?: string) {
   const result = runGlyphQa(publicDir);
   if (!result.ok) throw new Error(`Glyph QA failed:\n${result.errors.join("\n")}`);
+  return result;
+}
+
+export async function runAndRecordGlyphQa(publicDir?: string) {
+  const result = runGlyphQa(publicDir);
+  await recordFontQaRun({ ok: result.ok, checkedCount: result.checkedCount, errors: result.errors });
   return result;
 }

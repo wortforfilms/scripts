@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Monitor, Moon, Settings, Sun, Type, X, ZapOff } from "lucide-react";
+import { Eye, Monitor, Moon, Settings, Sun, Type, X, ZapOff } from "lucide-react";
 import { useAuth } from "../providers/AuthProvider";
 import { useI18n } from "../providers/I18nProvider";
 import {
@@ -28,11 +28,13 @@ export function SettingsFab() {
   const { viewer } = useAuth();
   const {
     accent,
+    contrast,
     density,
     font,
     radius,
     reduceMotion,
     setAccent,
+    setContrast,
     setDensity,
     setFont,
     setRadius,
@@ -200,11 +202,22 @@ export function SettingsFab() {
               onChange={(event) => setReduceMotion(event.target.checked)}
             />
           </label>
+
+          <label className="mt-3 flex items-center justify-between gap-3 rounded border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/80">
+            <span className="flex items-center gap-2"><Eye className="h-4 w-4" aria-hidden="true" /> High contrast</span>
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-amber-300"
+              checked={contrast === "high"}
+              onChange={(event) => setContrast(event.target.checked ? "high" : "standard")}
+            />
+          </label>
           </div>
         </section>
       ) : null}
       <button
         type="button"
+        data-accessibility-tour="settings"
         className="ml-auto flex h-12 w-12 items-center justify-center rounded-full border border-amber-300 bg-amber-300 text-black shadow-2xl transition hover:scale-105"
         onClick={() => setOpen((value) => !value)}
         aria-label="Open display settings"

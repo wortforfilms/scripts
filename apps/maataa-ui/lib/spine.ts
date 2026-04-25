@@ -8,7 +8,11 @@ export type SpineEventType =
   | "SKU_PUBLISHED"
   | "ORDER_PAID"
   | "ACCESS_UNLOCKED"
-  | "PAYMENT_FAILED";
+  | "PAYMENT_FAILED"
+  | "REVENUE_SPLIT_CREATED"
+  | "FONT_QA_COMPLETED"
+  | "GLYPH_REVIEW_REQUIRED"
+  | "PARTNERSHIP_INQUIRY_RECEIVED";
 
 export type SpineAuditEvent = {
   id: string;

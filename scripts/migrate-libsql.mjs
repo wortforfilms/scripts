@@ -1,6 +1,9 @@
-import { createClient } from "@libsql/client";
+import { createRequire } from "node:module";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+
+const requireFromApp = createRequire(new URL("../apps/maataa-ui/package.json", import.meta.url));
+const { createClient } = requireFromApp("@libsql/client");
 
 const databaseUrl = process.env.DATABASE_URL ?? process.env.RUNTIME_DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL or RUNTIME_DATABASE_URL is required");

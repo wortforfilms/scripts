@@ -51,7 +51,15 @@ const premiumFeatureKeys: FeatureKey[] = [
 
 const researcherFeatureKeys: FeatureKey[] = ["runtimeTimeline", "runtimeStatus", "spineEvents", "fontQa"];
 
-const reviewerFeatureKeys: FeatureKey[] = ["adminCatalog", "adminSkuReview", "adminScriptVerification", "adminUnicode"];
+const reviewerFeatureKeys: FeatureKey[] = [
+  "adminCatalog",
+  "adminSkuReview",
+  "adminScriptVerification",
+  "adminDatasetQa",
+  "adminGlyphQa",
+  "adminUnicode",
+  "adminUnicodeHeatmap"
+];
 
 const adminFeatureKeys: FeatureKey[] = [
   "adminOrders",
@@ -61,7 +69,9 @@ const adminFeatureKeys: FeatureKey[] = [
   "adminSkuSubmitReview",
   "adminSkuApprove",
   "adminSkuPublish",
-  "adminSkuArchive"
+  "adminSkuArchive",
+  "adminFinance",
+  "adminPartnerships"
 ];
 
 const toolPhaseByFeature = new Map<FeatureKey, ReleasePhase>(toolRegistry.map((tool) => [tool.featureKey, tool.phase]));

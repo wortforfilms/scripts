@@ -36,11 +36,15 @@ type LandingCopy = {
   whyBody: string;
   universeTitle: string;
   universeBody: string;
+  partnerKicker: string;
+  partnerTitle: string;
+  partnerBody: string;
   explore: string;
   tools: Card[];
   usps: Card[];
   categories: Card[];
   trust: Card[];
+  partnerCards: Card[];
 };
 
 const categoryImages = {
@@ -72,6 +76,9 @@ const englishCopy: LandingCopy = {
   whyBody: "The platform can grow toward the full 426-script target while still keeping public surfaces honest about what is verified, partial, or blocked.",
   universeTitle: "Explore Script Knowledge Universe",
   universeBody: "Books, Courses, Fonts, Tools, Datasets & more",
+  partnerKicker: "Marketplace ecosystem",
+  partnerTitle: "Creators, investors, sponsors, and affiliates are part of the release model.",
+  partnerBody: "Public journeys now connect to admin review, revenue split rules, verified checkout, access unlocks, and transfer approval gates.",
   explore: "Explore",
   tools: [
     { title: "Script Atlas", description: "Browse Unicode-derived records, curated verification overlays, and safe glyph policy.", href: "/scripts" },
@@ -88,13 +95,14 @@ const englishCopy: LandingCopy = {
     { title: "Release gated", description: "Internal alpha, public preview, and paid marketplace readiness are tracked separately." }
   ],
   categories: [
-    { title: "Books", description: "Research volumes, guides and more", image: categoryImages.books },
-    { title: "Courses", description: "Learn scripts, writing, linguistics and more", image: categoryImages.courses },
-    { title: "Fonts", description: "Unicode fonts, calligraphy and digital assets", image: categoryImages.fonts },
-    { title: "Datasets", description: "Manuscripts, glyphs, OCR and linguistic data", image: categoryImages.datasets },
-    { title: "AI Tools", description: "OCR, transliteration, models and APIs", image: categoryImages.ai },
-    { title: "Media", description: "Posters, infographics, videos and more", image: categoryImages.media },
-    { title: "SaaS Tools", description: "Converters, editors, timeline tools", image: categoryImages.saas }
+    { title: "Books", description: "Research volumes, guides and more", image: categoryImages.books, href: "/products" },
+    { title: "Courses", description: "Learn scripts, writing, linguistics and more", image: categoryImages.courses, href: "/courses" },
+    { title: "Fonts", description: "Unicode fonts, calligraphy and digital assets", image: categoryImages.fonts, href: "/products" },
+    { title: "Tools", description: "Verification, Unicode, glyph and release tools", image: categoryImages.saas, href: "/tools" },
+    { title: "Datasets", description: "Manuscripts, glyphs, OCR and linguistic data", image: categoryImages.datasets, href: "/dataset-qa" },
+    { title: "AI Tools", description: "OCR, transliteration, models and APIs", image: categoryImages.ai, href: "/maataa" },
+    { title: "Media", description: "Posters, infographics, videos and more", image: categoryImages.media, href: "/products" },
+    { title: "SaaS Tools", description: "Converters, editors, timeline tools", image: categoryImages.saas, href: "/tools" }
   ],
   trust: [
     { title: "10,000 Years of History", description: "From ancient to modern scripts across time and civilizations." },
@@ -102,6 +110,13 @@ const englishCopy: LandingCopy = {
     { title: "Authentic & Verified", description: "Research-driven records with explicit verification status." },
     { title: "Community Driven", description: "Built for scholars, researchers, learners and creators." },
     { title: "PHKD Powered", description: "Part of Personal History & Knowledge Digitization mission." }
+  ],
+  partnerCards: [
+    { title: "For Investors", description: "Fund verified infrastructure and marketplace growth with manual split-rule review.", href: "/investors" },
+    { title: "For Sponsors", description: "Sponsor scripts, datasets, glyph QA, courses, and public-good preservation.", href: "/sponsors" },
+    { title: "For Creators", description: "Publish books, fonts, datasets, tools, and research packs through draft-first approval.", href: "/creators" },
+    { title: "Divyaang Access", description: "Support differently enabled learners with contrast, type, keyboard, language, and caption-first UX.", href: "/accessibility" },
+    { title: "Partner Portal", description: "All partner intake lands in admin review before contracts, splits, or transfers.", href: "/partners" }
   ]
 };
 
@@ -127,6 +142,9 @@ const landingCopy: Record<LanguageCode, LandingCopy> = {
     whyBody: "Platform 426-script target तक बढ़ सकता है, while public surfaces verified, partial और blocked status को ईमानदारी से दिखाते हैं.",
     universeTitle: "Script Knowledge Universe देखें",
     universeBody: "Books, Courses, Fonts, Tools, Datasets और अधिक",
+    partnerKicker: "Marketplace ecosystem",
+    partnerTitle: "Creators, investors, sponsors और affiliates release model का हिस्सा हैं.",
+    partnerBody: "Public journeys admin review, revenue split rules, verified checkout, access unlocks और transfer approval gates से जुड़ते हैं.",
     explore: "देखें"
   },
   sa: {
@@ -146,6 +164,9 @@ const landingCopy: Record<LanguageCode, LandingCopy> = {
     whyBody: "426-script लक्ष्यं प्रति वृद्धिः शक्या, तथापि public surfaces verified, partial, blocked इति स्पष्टं दर्शयन्ति.",
     universeTitle: "Script Knowledge Universe अन्वेषयतु",
     universeBody: "Books, Courses, Fonts, Tools, Datasets इत्यादि",
+    partnerKicker: "Marketplace ecosystem",
+    partnerTitle: "Creators, investors, sponsors, affiliates च release model मध्ये सन्ति.",
+    partnerBody: "Public journeys admin review, revenue split rules, verified checkout, access unlocks, transfer approval gates इत्येतैः संयुक्ताः.",
     explore: "अन्वेषयतु"
   },
   ta: {
@@ -168,6 +189,9 @@ const landingCopy: Record<LanguageCode, LandingCopy> = {
     whyBody: "Platform 426-script target நோக்கி வளரலாம்; public surfaces verified, partial, blocked நிலைகளை நேர்மையாக காட்டும்.",
     universeTitle: "Script Knowledge Universe",
     universeBody: "Books, Courses, Fonts, Tools, Datasets மற்றும் மேலும்",
+    partnerKicker: "Marketplace ecosystem",
+    partnerTitle: "Creators, investors, sponsors மற்றும் affiliates release model இன் பகுதிகள்.",
+    partnerBody: "Public journeys admin review, revenue split rules, verified checkout, access unlocks மற்றும் transfer approval gates உடன் இணைகின்றன.",
     explore: "பார்க்க"
   },
   bn: {
@@ -190,6 +214,9 @@ const landingCopy: Record<LanguageCode, LandingCopy> = {
     whyBody: "Platform 426-script target-এর দিকে বাড়তে পারে, while public surfaces verified, partial, blocked status সৎভাবে দেখায়.",
     universeTitle: "Script Knowledge Universe দেখুন",
     universeBody: "Books, Courses, Fonts, Tools, Datasets এবং আরও",
+    partnerKicker: "Marketplace ecosystem",
+    partnerTitle: "Creators, investors, sponsors এবং affiliates release model-এর অংশ.",
+    partnerBody: "Public journeys admin review, revenue split rules, verified checkout, access unlocks এবং transfer approval gates-এর সঙ্গে যুক্ত.",
     explore: "দেখুন"
   },
   ar: {
@@ -212,6 +239,9 @@ const landingCopy: Record<LanguageCode, LandingCopy> = {
     whyBody: "يمكن للمنصة النمو نحو هدف 426 خطًا مع إبقاء الواجهات العامة صادقة بشأن الموثق والجزئي والمحظور.",
     universeTitle: "استكشف عالم معرفة الخطوط",
     universeBody: "كتب، دورات، خطوط رقمية، أدوات، مجموعات بيانات والمزيد",
+    partnerKicker: "نظام السوق",
+    partnerTitle: "المبدعون والمستثمرون والرعاة والشركاء جزء من نموذج الإصدار.",
+    partnerBody: "مسارات الشراكة تصل إلى مراجعة الإدارة وقواعد توزيع الإيرادات والدفع الموثق ومنح الوصول وموافقة التحويل.",
     explore: "استكشف"
   }
 };
@@ -228,7 +258,7 @@ export function LandingPageContent({ datasetCurrent, datasetTarget, partialCount
     <main>
       <section className="relative overflow-hidden bg-[#071018] px-6 py-14">
         <img
-          src="/landing/hero-manuscript.png"
+          src="/landing/hero-generated-20260425.png"
           alt=""
           className="absolute inset-y-0 right-0 h-full w-full object-cover opacity-80 md:w-[72%]"
         />
@@ -315,6 +345,24 @@ export function LandingPageContent({ datasetCurrent, datasetTarget, partialCount
         </div>
       </section>
 
+      <section className="bg-[#101820] px-6 py-12">
+        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.75fr_1.25fr]">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-amber-300">{copy.partnerKicker}</p>
+            <h2 className="mt-2 text-4xl font-semibold text-white">{copy.partnerTitle}</h2>
+            <p className="mt-4 text-white/68">{copy.partnerBody}</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {copy.partnerCards.map((card) => (
+              <Link key={card.title} href={card.href ?? "/partners"} className="rounded border border-white/10 bg-white/[0.04] p-5 transition hover:border-amber-300/70 hover:bg-white/[0.08]">
+                <h3 className="text-lg font-semibold text-white">{card.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-white/65">{card.description}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="bg-[#f2efeb] px-6 py-5 text-[#171717]">
         <div className="mx-auto max-w-7xl">
           <div className="text-center">
@@ -322,11 +370,11 @@ export function LandingPageContent({ datasetCurrent, datasetTarget, partialCount
             <div className="mx-auto mt-2 h-0.5 w-5 bg-amber-500" />
             <p className="mt-2 text-sm text-neutral-700">{copy.universeBody}</p>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {copy.categories.map((card) => (
               <Link
                 key={card.title}
-                href="/scripts"
+                href={card.href ?? "/scripts"}
                 className="rounded border border-neutral-300 bg-white/50 px-4 py-4 text-center shadow-sm transition hover:border-amber-500 hover:bg-white"
               >
                 <img src={card.image} alt="" className="mx-auto h-20 w-24 object-contain" />

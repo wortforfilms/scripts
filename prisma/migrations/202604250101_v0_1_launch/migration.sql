@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS Script (
   fallbackGlyphAsset TEXT NOT NULL,
   family TEXT NOT NULL,
   parentId TEXT,
-  region TEXT NOT NULL,
+  region TEXT,
   eraStart INTEGER,
   eraEnd INTEGER,
   direction TEXT NOT NULL,

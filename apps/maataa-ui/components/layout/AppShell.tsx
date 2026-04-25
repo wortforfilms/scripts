@@ -11,7 +11,9 @@ export async function AppShell({ children }: AppShellProps) {
   const viewer = await getViewer();
   return (
     <AppProviders viewer={viewer}>
-      <AppChrome>{children}</AppChrome>
+      <AppChrome>
+        <div data-joyride="page-main">{children}</div>
+      </AppChrome>
     </AppProviders>
   );
 }

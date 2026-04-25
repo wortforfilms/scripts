@@ -14,6 +14,9 @@ export const kharosthiChain: ScriptRecord[] = [
     eraStart: -900,
     eraEnd: 700,
     direction: "RTL",
+    systemType: "UNICODE_SCRIPT",
+    unicodeSupported: true,
+    unicodeRanges: [{ start: "U+10840", end: "U+1085F" }],
     verificationStatus: "VERIFIED",
     sources: ["Unicode Standard, Aramaic block U+10840-U+1085F"]
   },
@@ -30,6 +33,9 @@ export const kharosthiChain: ScriptRecord[] = [
     eraStart: -300,
     eraEnd: 400,
     direction: "RTL",
+    systemType: "UNICODE_SCRIPT",
+    unicodeSupported: true,
+    unicodeRanges: [{ start: "U+10A00", end: "U+10A5F" }],
     verificationStatus: "PARTIAL",
     sources: [
       "Unicode Standard, Kharoshthi block U+10A00-U+10A5F",
@@ -49,6 +55,9 @@ export const kharosthiChain: ScriptRecord[] = [
     eraStart: -100,
     eraEnd: 300,
     direction: "RTL",
+    systemType: "MANUSCRIPT_CHAIN",
+    unicodeSupported: false,
+    unicodeRanges: [],
     verificationStatus: "PARTIAL",
     sources: ["British Library Kharosthi/Gandhari manuscript catalogues"]
   },
@@ -65,6 +74,9 @@ export const kharosthiChain: ScriptRecord[] = [
     eraStart: 100,
     eraEnd: 900,
     direction: "RTL",
+    systemType: "TRANSMISSION",
+    unicodeSupported: false,
+    unicodeRanges: [],
     verificationStatus: "PARTIAL",
     sources: ["Scholarly secondary literature on Gandhari Buddhist transmission"]
   }

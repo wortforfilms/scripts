@@ -4,6 +4,7 @@ import {
   ensureRadioStateReady,
   getRadioState
 } from "../../../../../../services/playout-worker/index.js";
+import { requireFeature, routeError } from "../../../../lib/auth";
 
 type TimelineEvent = {
   time?: string;
@@ -11,22 +12,27 @@ type TimelineEvent = {
 };
 
 export async function GET() {
-  await ensureRadioStateReady();
-  const scheduler = (getSchedulerState().logs ?? []) as TimelineEvent[];
-  const proof = (getProofState().logs ?? []) as TimelineEvent[];
-  const radio = (getRadioState().logs ?? []) as TimelineEvent[];
+  try {
+    await requireFeature("runtimeTimeline");
+    await ensureRadioStateReady();
+    const scheduler = (getSchedulerState().logs ?? []) as TimelineEvent[];
+    const proof = (getProofState().logs ?? []) as TimelineEvent[];
+    const radio = (getRadioState().logs ?? []) as TimelineEvent[];
 
-  const timeline: TimelineEvent[] = [...scheduler, ...proof, ...radio].sort((a, b) => {
-    return new Date(b.time ?? 0).getTime() - new Date(a.time ?? 0).getTime();
-  });
+    const timeline: TimelineEvent[] = [...scheduler, ...proof, ...radio].sort((a, b) => {
+      return new Date(b.time ?? 0).getTime() - new Date(a.time ?? 0).getTime();
+    });
 
-  return Response.json({
-    timeline,
-    counts: {
-      scheduler: scheduler.length,
-      proof: proof.length,
-      radio: radio.length,
-      total: timeline.length
-    }
-  });
+    return Response.json({
+      timeline,
+      counts: {
+        scheduler: scheduler.length,
+        proof: proof.length,
+        radio: radio.length,
+        total: timeline.length
+      }
+    });
+  } catch (error) {
+    return routeError(error);
+  }
 }

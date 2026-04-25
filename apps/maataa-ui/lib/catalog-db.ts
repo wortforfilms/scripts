@@ -8,6 +8,7 @@ import {
   type PublishStatus,
   type SkuState
 } from "./catalog-policy";
+import { createRevenueSplitLedger, ensureRevenueDb } from "./revenue/create-ledger";
 import { recordSpineEvent } from "./spine";
 
 export type CatalogSku = {
@@ -99,6 +100,27 @@ export async function ensureCatalogDb() {
       UNIQUE(user_id, product_id)
     )
   `);
+  await runtimeDb.execute(`
+    CREATE TABLE IF NOT EXISTS webhook_events (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      event_id TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      processed_at TEXT NOT NULL,
+      UNIQUE(provider, event_id)
+    )
+  `);
+  await runtimeDb.execute(`
+    CREATE TABLE IF NOT EXISTS font_qa_runs (
+      id TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      checked_count INTEGER NOT NULL,
+      failed_count INTEGER NOT NULL,
+      errors_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  await ensureRevenueDb();
   catalogInitialized = true;
 }
 
@@ -218,23 +240,38 @@ export async function createPendingOrder(input: { userId: string; skuIds: string
 export async function markOrderPaidFromWebhook(input: {
   razorpayOrderId: string;
   razorpayPaymentId: string;
+  eventId: string;
   rawEvent: unknown;
 }) {
   await ensureCatalogDb();
+  const eventType = (input.rawEvent as { event?: unknown }).event;
+  const eventResult = await runtimeDb.execute({
+    sql: `
+      INSERT OR IGNORE INTO webhook_events (id, provider, event_id, event_type, processed_at)
+      VALUES (?, 'razorpay', ?, ?, ?)
+    `,
+    args: [crypto.randomUUID(), input.eventId, typeof eventType === "string" ? eventType : "unknown", new Date().toISOString()]
+  });
+  if (eventResult.rowsAffected === 0) {
+    return { duplicate: true, orderId: null, unlocked: 0, ledgerEntries: 0 };
+  }
+
   const orderResult = await runtimeDb.execute({
-    sql: "SELECT id, user_id, items_json FROM orders WHERE razorpay_order_id = ?",
+    sql: "SELECT id, user_id, status, amount_in_paise, currency, items_json FROM orders WHERE razorpay_order_id = ?",
     args: [input.razorpayOrderId]
   });
   const order = orderResult.rows[0];
   if (!order) throw new Error("Order not found");
+  if (String(order.status) === "PAID") return { duplicate: true, orderId: String(order.id), unlocked: 0, ledgerEntries: 0 };
   const now = new Date().toISOString();
   await runtimeDb.execute({ sql: "UPDATE orders SET status = 'PAID', updated_at = ? WHERE id = ?", args: [now, String(order.id)] });
+  const paymentId = crypto.randomUUID();
   await runtimeDb.execute({
     sql: `
       INSERT INTO payments (id, order_id, provider, provider_payment_id, provider_order_id, status, signature_verified, raw_event_json, created_at, updated_at)
       VALUES (?, ?, 'razorpay', ?, ?, 'CAPTURED', 1, ?, ?, ?)
     `,
-    args: [crypto.randomUUID(), String(order.id), input.razorpayPaymentId, input.razorpayOrderId, JSON.stringify(input.rawEvent), now, now]
+    args: [paymentId, String(order.id), input.razorpayPaymentId, input.razorpayOrderId, JSON.stringify(input.rawEvent), now, now]
   });
   await recordSpineEvent({ eventType: "ORDER_PAID", subjectId: String(order.id), payload: { provider: "razorpay" } });
   const items = JSON.parse(String(order.items_json)) as CatalogSku[];
@@ -245,7 +282,46 @@ export async function markOrderPaidFromWebhook(input: {
     });
     await recordSpineEvent({ eventType: "ACCESS_UNLOCKED", subjectId: item.productId, payload: { orderId: String(order.id) } });
   }
-  return { orderId: String(order.id), unlocked: items.length };
+  const ledger = await createRevenueSplitLedger({
+    orderId: String(order.id),
+    paymentId,
+    amountInPaise: Number(order.amount_in_paise),
+    currency: String(order.currency),
+    productIds: items.map((item) => item.productId)
+  });
+  return { duplicate: false, orderId: String(order.id), unlocked: items.length, ledgerEntries: ledger.length };
+}
+
+export async function recordFontQaRun(input: { ok: boolean; checkedCount: number; errors: string[] }) {
+  await ensureCatalogDb();
+  const id = crypto.randomUUID();
+  await runtimeDb.execute({
+    sql: `
+      INSERT INTO font_qa_runs (id, status, checked_count, failed_count, errors_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `,
+    args: [
+      id,
+      input.ok ? "PASSED" : "FAILED",
+      input.checkedCount,
+      input.errors.length,
+      JSON.stringify(input.errors),
+      new Date().toISOString()
+    ]
+  });
+  await recordSpineEvent({
+    eventType: "FONT_QA_COMPLETED",
+    subjectId: id,
+    payload: { status: input.ok ? "PASSED" : "FAILED", failedCount: input.errors.length }
+  });
+  if (!input.ok) {
+    await recordSpineEvent({
+      eventType: "GLYPH_REVIEW_REQUIRED",
+      subjectId: id,
+      payload: { failedCount: input.errors.length }
+    });
+  }
+  return { id, status: input.ok ? "PASSED" : "FAILED" };
 }
 
 export async function listUserAccess(userId: string) {
@@ -259,4 +335,65 @@ export async function listUserAccess(userId: string) {
     orderId: String(row.order_id),
     grantedAt: String(row.granted_at)
   }));
+}
+
+export async function listFinanceSummary() {
+  await ensureCatalogDb();
+  const orders = await runtimeDb.execute(`
+    SELECT id, user_id, status, amount_in_paise, currency, razorpay_order_id, created_at, updated_at
+    FROM orders
+    ORDER BY created_at DESC
+    LIMIT 50
+  `);
+  const payments = await runtimeDb.execute(`
+    SELECT order_id, provider, provider_payment_id, provider_order_id, status, signature_verified, created_at
+    FROM payments
+    ORDER BY created_at DESC
+    LIMIT 50
+  `);
+  const webhooks = await runtimeDb.execute(`
+    SELECT provider, event_id, event_type, processed_at
+    FROM webhook_events
+    ORDER BY processed_at DESC
+    LIMIT 50
+  `);
+  const access = await runtimeDb.execute(`
+    SELECT user_id, product_id, order_id, granted_at
+    FROM user_access
+    ORDER BY granted_at DESC
+    LIMIT 50
+  `);
+  return {
+    orders: orders.rows.map((row) => ({
+      id: String(row.id),
+      userId: String(row.user_id),
+      status: String(row.status),
+      amountInPaise: Number(row.amount_in_paise),
+      currency: String(row.currency),
+      razorpayOrderId: row.razorpay_order_id ? String(row.razorpay_order_id) : null,
+      createdAt: String(row.created_at),
+      updatedAt: String(row.updated_at)
+    })),
+    payments: payments.rows.map((row) => ({
+      orderId: String(row.order_id),
+      provider: String(row.provider),
+      providerPaymentId: row.provider_payment_id ? String(row.provider_payment_id) : null,
+      providerOrderId: row.provider_order_id ? String(row.provider_order_id) : null,
+      status: String(row.status),
+      signatureVerified: Boolean(Number(row.signature_verified)),
+      createdAt: String(row.created_at)
+    })),
+    webhooks: webhooks.rows.map((row) => ({
+      provider: String(row.provider),
+      eventId: String(row.event_id),
+      eventType: String(row.event_type),
+      processedAt: String(row.processed_at)
+    })),
+    access: access.rows.map((row) => ({
+      userId: String(row.user_id),
+      productId: String(row.product_id),
+      orderId: String(row.order_id),
+      grantedAt: String(row.granted_at)
+    }))
+  };
 }

@@ -6,7 +6,16 @@ export const metadata = {
 };
 
 export default function ProductsPage() {
-  const sections = ["Books", "Fonts", "Datasets", "Media", "Research Packs", "Digital Licenses"];
+  const sections = [
+    { title: "Books", href: "/creators" },
+    { title: "Courses", href: "/creators" },
+    { title: "Fonts", href: "/creators" },
+    { title: "Tools", href: "/creators" },
+    { title: "Datasets", href: "/sponsors" },
+    { title: "Media", href: "/sponsors" },
+    { title: "Research Packs", href: "/creators" },
+    { title: "Digital Licenses", href: "/checkout" }
+  ];
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
       <h1 className="text-3xl font-semibold">Products</h1>
@@ -15,9 +24,9 @@ export default function ProductsPage() {
       </p>
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         {sections.map((section) => (
-          <Link key={section} href="/checkout" className="rounded border border-white/10 bg-white/5 p-5 hover:border-amber-300/60">
-            <h2 className="text-xl font-semibold">{section}</h2>
-            <p className="mt-2 text-sm leading-6 text-white/60">Draft-only catalog surface until SKU approval and paid access checks are complete.</p>
+          <Link key={section.title} href={section.href} className="rounded border border-white/10 bg-white/5 p-5 hover:border-amber-300/60">
+            <h2 className="text-xl font-semibold">{section.title}</h2>
+            <p className="mt-2 text-sm leading-6 text-white/60">Connected to creator, sponsor, approval, checkout, and access-control flows.</p>
           </Link>
         ))}
       </div>

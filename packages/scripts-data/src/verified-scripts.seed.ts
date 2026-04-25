@@ -16,6 +16,9 @@ const curatedScripts: ScriptRecord[] = [
     eraStart: -700,
     eraEnd: null,
     direction: "LTR",
+    systemType: "UNICODE_SCRIPT",
+    unicodeSupported: true,
+    unicodeRanges: [{ start: "U+0000", end: "U+007F" }],
     verificationStatus: "VERIFIED",
     sources: ["Unicode Standard, Basic Latin U+0000-U+007F"]
   },
@@ -32,6 +35,9 @@ const curatedScripts: ScriptRecord[] = [
     eraStart: 700,
     eraEnd: null,
     direction: "LTR",
+    systemType: "UNICODE_SCRIPT",
+    unicodeSupported: true,
+    unicodeRanges: [{ start: "U+0900", end: "U+097F" }],
     verificationStatus: "VERIFIED",
     sources: ["Unicode Standard, Devanagari block U+0900-U+097F"]
   },
@@ -48,6 +54,9 @@ const curatedScripts: ScriptRecord[] = [
     eraStart: -300,
     eraEnd: null,
     direction: "LTR",
+    systemType: "UNICODE_SCRIPT",
+    unicodeSupported: true,
+    unicodeRanges: [{ start: "U+0B80", end: "U+0BFF" }],
     verificationStatus: "VERIFIED",
     sources: ["Unicode Standard, Tamil block U+0B80-U+0BFF"]
   },
@@ -64,6 +73,9 @@ const curatedScripts: ScriptRecord[] = [
     eraStart: -1000,
     eraEnd: null,
     direction: "RTL",
+    systemType: "UNICODE_SCRIPT",
+    unicodeSupported: true,
+    unicodeRanges: [{ start: "U+0590", end: "U+05FF" }],
     verificationStatus: "VERIFIED",
     sources: ["Unicode Standard, Hebrew block U+0590-U+05FF"]
   },

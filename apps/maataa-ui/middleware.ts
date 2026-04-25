@@ -76,6 +76,10 @@ export const config = {
     "/api/admin/:path*",
     "/api/checkout/:path*",
     "/api/me/:path*",
-    "/api/spine/:path*"
+    "/api/spine/:path*",
+    "/api/partnerships/:path*",
+    "/api/runtime/:path*",
+    "/api/proof/anchor/:path*",
+    "/api/proof/ipfs/:path*"
   ]
 };

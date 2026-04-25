@@ -275,6 +275,53 @@ html, body {
   animation-iteration-count: 1 !important;
 }
 
+:root[data-contrast="high"] {
+  --maataa-accent: #fde047;
+  --maataa-accent-strong: #facc15;
+}
+
+:root[data-contrast="high"] body {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+:root[data-contrast="high"] :where(
+  .bg-\[\#061018\],
+  .bg-\[\#061018\]\/95,
+  .bg-\[\#071018\],
+  .bg-\[\#101820\],
+  .bg-black\/20,
+  .bg-black\/25,
+  .bg-black\/30,
+  .bg-black\/40,
+  .bg-white\/5,
+  .bg-white\/10,
+  .bg-white\/\[0\.04\],
+  .bg-white\/\[0\.06\]
+) {
+  background-color: #000 !important;
+}
+
+:root[data-contrast="high"] :where(.text-white\/50, .text-white\/55, .text-white\/60, .text-white\/65, .text-white\/70, .text-white\/75, .text-white\/80) {
+  color: #fff !important;
+}
+
+:root[data-contrast="high"] :where(.border-white\/10, .border-white\/15, .border-white\/20, .border-neutral-300) {
+  border-color: #fff !important;
+}
+
+:root[data-contrast="high"] :where(a, button, input, textarea, select):focus-visible {
+  outline: 3px solid var(--maataa-accent) !important;
+  outline-offset: 3px !important;
+}
+
+:where([data-tour-active="true"]) {
+  outline: 4px solid var(--maataa-accent) !important;
+  outline-offset: 6px !important;
+  position: relative;
+  z-index: 55;
+}
+
 * {
   box-sizing: border-box;
 }

@@ -35,6 +35,38 @@ enum UserRole {
   SUPER_ADMIN
 }
 
+enum AccountType {
+  INDIVIDUAL
+  COMPANY
+  ORGANIZATION
+  GOVERNMENT
+}
+
+enum AccountRole {
+  OWNER
+  ADMIN
+  REVIEWER
+  MEMBER
+  BILLING
+}
+
+enum RevenueSplitParty {
+  PLATFORM
+  CREATOR
+  INVESTOR
+  SPONSOR
+  AFFILIATE
+  TAX
+}
+
+enum PartnershipType {
+  INVESTOR
+  SPONSOR
+  CREATOR
+  AFFILIATE
+  PARTNER
+}
+
 enum OrderStatus {
   DRAFT
   PENDING_PAYMENT
@@ -68,7 +100,7 @@ model Script {
   parentId              String?
   parent                Script?            @relation("ScriptTree", fields: [parentId], references: [id])
   children              Script[]           @relation("ScriptTree")
-  region                String
+  region                String?
   eraStart              Int?
   eraEnd                Int?
   direction             ScriptDirection
@@ -78,6 +110,48 @@ model Script {
   products              Product[]
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
+}
+
+model User {
+  id              String        @id
+  email           String        @unique
+  name            String
+  passwordHash    String        @map("password_hash")
+  passwordSalt    String        @map("password_salt")
+  role            UserRole      @default(USER)
+  plan            String        @default("FREE")
+  permissionsJson String        @default("[]") @map("permissions_json")
+  accounts        UserAccount[]
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@map("auth_users")
+}
+
+model Account {
+  id        String        @id
+  name      String
+  type      AccountType
+  plan      String        @default("FREE")
+  users     UserAccount[]
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  @@map("accounts")
+}
+
+model UserAccount {
+  id          String      @id
+  userId      String      @map("user_id")
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId   String      @map("account_id")
+  account     Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountRole AccountRole @map("account_role")
+  isDefault   Boolean     @default(true) @map("is_default")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  @@unique([userId, accountId])
+  @@map("user_accounts")
 }
 
 model ScriptSource {
@@ -209,4 +283,61 @@ model SpineAuditLog {
   subjectId   String?
   payloadJson String?
   createdAt   DateTime @default(now())
+}
+
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  provider    String
+  eventId     String
+  eventType   String
+  processedAt DateTime @default(now())
+
+  @@unique([provider, eventId])
+  @@map("webhook_events")
+}
+
+model RevenueSplitRule {
+  id                    String            @id @default(cuid())
+  scopeType             String
+  scopeId               String
+  party                 RevenueSplitParty
+  accountId             String?
+  basisPoints           Int
+  requiresAdminApproval Boolean           @default(true)
+  createdAt             DateTime          @default(now())
+}
+
+model RevenueSplitLedger {
+  id             String            @id @default(cuid())
+  orderId        String
+  paymentId      String
+  party          RevenueSplitParty
+  accountId      String?
+  basisPoints    Int
+  amountInPaise  Int
+  currency       String            @default("INR")
+  transferStatus String            @default("PENDING_ADMIN_APPROVAL")
+  createdAt      DateTime          @default(now())
+}
+
+model FontQaRun {
+  id           String   @id @default(cuid())
+  status       String
+  checkedCount Int
+  failedCount  Int
+  errorsJson   String
+  createdAt    DateTime @default(now())
+}
+
+model PartnershipInquiry {
+  id           String          @id @default(cuid())
+  type         PartnershipType
+  name         String
+  email        String
+  organization String?
+  intent       String
+  status       String          @default("NEW")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  @@map("partnership_inquiries")
 }

@@ -2,6 +2,10 @@ export type UserRole = "GUEST" | "USER" | "REVIEWER" | "ADMIN" | "SUPER_ADMIN";
 
 export type UserPlan = "FREE" | "PREMIUM" | "RESEARCHER" | "ENTERPRISE";
 
+export type AccountType = "INDIVIDUAL" | "COMPANY" | "ORGANIZATION" | "GOVERNMENT";
+
+export type AccountRole = "OWNER" | "ADMIN" | "REVIEWER" | "MEMBER" | "BILLING";
+
 export type FeatureKey =
   | "home"
   | "signin"
@@ -49,6 +53,11 @@ export type FeatureKey =
   | "adminOrders"
   | "adminSpine"
   | "adminFeatures"
+  | "adminDatasetQa"
+  | "adminGlyphQa"
+  | "adminUnicodeHeatmap"
+  | "adminFinance"
+  | "adminPartnerships"
   | "adminSkuGenerate"
   | "adminSkuSubmitReview"
   | "adminSkuApprove"
@@ -59,6 +68,10 @@ export type FeatureKey =
 
 export type AccessViewer = {
   id: string | null;
+  userId: string | null;
+  accountId: string | null;
+  accountType: AccountType | null;
+  accountRole: AccountRole | null;
   role: UserRole;
   plan: UserPlan;
   permissions: string[];

@@ -1,5 +1,6 @@
 import phase1UnicodeDataset from "./data/phase1-unicode-script-dataset.json";
-import { assertValidScripts, type ScriptDirection, type ScriptRecord, type VerificationStatus } from "./script.schema";
+import unicodeScriptsFull from "./data/unicode-scripts-full.json";
+import { assertValidScripts, type ScriptDirection, type ScriptRecord, type UnicodeRange, type VerificationStatus } from "./script.schema";
 
 type Phase1UnicodeEntry = {
   id: string;
@@ -30,6 +31,19 @@ type Phase1UnicodeDataset = {
 };
 
 const dataset = phase1UnicodeDataset as Phase1UnicodeDataset;
+const unicodeRangeMap = new Map(
+  (unicodeScriptsFull as Array<{ name: string; unicodeRanges: Array<{ start: string; end: string }> }>).map((script) => [
+    script.name.replace(/[^a-z0-9]/gi, "").toLowerCase(),
+    script.unicodeRanges.map((range): UnicodeRange => ({
+      start: `U+${range.start.replace(/^U\+/i, "").toUpperCase()}`,
+      end: `U+${range.end.replace(/^U\+/i, "").toUpperCase()}`
+    }))
+  ])
+);
+
+function unicodeRangesFor(entry: Phase1UnicodeEntry) {
+  return unicodeRangeMap.get(entry.unicodeScriptValue.replace(/[^a-z0-9]/gi, "").toLowerCase()) ?? [];
+}
 
 export const phase1UnicodeDatasetMeta = {
   dataset: dataset.dataset,
@@ -52,6 +66,9 @@ export const phase1UnicodeScriptsSeed: ScriptRecord[] = dataset.entries.map((ent
   eraStart: entry.eraStart,
   eraEnd: entry.eraEnd,
   direction: entry.direction,
+  systemType: entry.id === "unknown" || entry.id === "common" || entry.id === "inherited" ? "SPECIAL" : "UNICODE_SCRIPT",
+  unicodeSupported: unicodeRangesFor(entry).length > 0,
+  unicodeRanges: unicodeRangesFor(entry),
   verificationStatus: entry.verificationStatus,
   sources: entry.sources
 }));

@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { VerifiedGlyph } from "../../components/scripts/VerifiedGlyph";
+import { ScriptCatalogBrowser } from "../../components/scripts/ScriptCatalogBrowser";
 import { scriptDatasetStatus, verifiedScriptsSeed } from "../../lib/script-data";
 
 export const metadata = {
@@ -24,26 +23,7 @@ export default function ScriptsIndexPage() {
         </div>
       </div>
 
-      <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {verifiedScriptsSeed.map((script) => (
-          <Link
-            key={script.id}
-            href={`/scripts/${script.slug}`}
-            className="rounded border border-white/10 bg-white/5 p-5 transition hover:border-emerald-300/50 hover:bg-white/10"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-semibold">{script.name}</h2>
-                <p className="mt-1 text-sm text-white/55">{script.region}</p>
-              </div>
-              <span className="rounded bg-white/10 px-2 py-1 text-xs text-white/70">{script.verificationStatus}</span>
-            </div>
-            <div className="mt-5 text-4xl">
-              <VerifiedGlyph script={script} />
-            </div>
-          </Link>
-        ))}
-      </div>
+      <ScriptCatalogBrowser scripts={verifiedScriptsSeed} targetCount={dataset.target} />
     </main>
   );
 }

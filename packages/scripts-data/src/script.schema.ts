@@ -2,6 +2,13 @@ export type ScriptDirection = "LTR" | "RTL" | "TTB" | "BTT" | "MIXED";
 
 export type VerificationStatus = "UNVERIFIED" | "PARTIAL" | "VERIFIED";
 
+export type ScriptSystemType = "UNICODE_SCRIPT" | "SPECIAL" | "MANUSCRIPT_CHAIN" | "TRANSMISSION";
+
+export type UnicodeRange = {
+  start: string;
+  end: string;
+};
+
 export type ScriptRecord = {
   id: string;
   slug: string;
@@ -15,12 +22,16 @@ export type ScriptRecord = {
   eraStart: number | null;
   eraEnd: number | null;
   direction: ScriptDirection;
+  systemType: ScriptSystemType;
+  unicodeSupported: boolean;
+  unicodeRanges: UnicodeRange[];
   verificationStatus: VerificationStatus;
   sources: string[];
 };
 
 const directions = new Set<ScriptDirection>(["LTR", "RTL", "TTB", "BTT", "MIXED"]);
 const statuses = new Set<VerificationStatus>(["UNVERIFIED", "PARTIAL", "VERIFIED"]);
+const systemTypes = new Set<ScriptSystemType>(["UNICODE_SCRIPT", "SPECIAL", "MANUSCRIPT_CHAIN", "TRANSMISSION"]);
 
 export function validateScriptRecord(script: ScriptRecord): string[] {
   const errors: string[] = [];
@@ -32,6 +43,15 @@ export function validateScriptRecord(script: ScriptRecord): string[] {
   if (!script.family.trim()) errors.push(`${script.id}: family is required`);
   if (script.region !== null && !script.region.trim()) errors.push(`${script.id}: region must be non-empty when provided`);
   if (!directions.has(script.direction)) errors.push(`${script.id}: invalid direction`);
+  if (!systemTypes.has(script.systemType)) errors.push(`${script.id}: invalid systemType`);
+  if (script.unicodeSupported && script.unicodeRanges.length === 0) {
+    errors.push(`${script.id}: unicodeRanges are required when unicodeSupported is true`);
+  }
+  for (const range of script.unicodeRanges) {
+    if (!/^U\+[0-9A-F]{4,6}$/.test(range.start) || !/^U\+[0-9A-F]{4,6}$/.test(range.end)) {
+      errors.push(`${script.id}: invalid unicodeRange ${range.start}-${range.end}`);
+    }
+  }
   if (!statuses.has(script.verificationStatus)) errors.push(`${script.id}: invalid verificationStatus`);
   if (script.verificationStatus === "VERIFIED" && !script.verifiedUnicodeSample?.trim()) {
     errors.push(`${script.id}: VERIFIED scripts require verifiedUnicodeSample`);
