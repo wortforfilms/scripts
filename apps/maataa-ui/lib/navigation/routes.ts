@@ -1,4 +1,5 @@
 import type { FeatureKey } from "../access/types";
+import { toolRegistry } from "../tools/tool-registry";
 
 export type RouteAccess = {
   pattern: string;
@@ -15,7 +16,7 @@ export const routeRegistry: RouteAccess[] = [
   { pattern: "/scripts", featureKey: "scriptCatalog" },
   { pattern: "/legal", featureKey: "legal" },
   { pattern: "/badge", featureKey: "badgeViewer" },
-  { pattern: "/timeline", featureKey: "learningTimeline" },
+  ...toolRegistry.map((tool) => ({ pattern: tool.route, featureKey: tool.featureKey })),
   { pattern: "/proof-inspector", featureKey: "proofInspector" },
   { pattern: "/merkle", featureKey: "merkleExplorer" },
   { pattern: "/replay", featureKey: "replay" },
@@ -39,6 +40,7 @@ export const routeRegistry: RouteAccess[] = [
   { pattern: "/admin/scripts/verification", featureKey: "adminScriptVerification" },
   { pattern: "/admin/orders", featureKey: "adminOrders" },
   { pattern: "/admin/spine", featureKey: "adminSpine" },
+  { pattern: "/admin/features", featureKey: "adminFeatures" },
   { pattern: "/admin", featureKey: "adminCatalog" }
 ];
 

@@ -5,11 +5,14 @@ import type { FeatureKey } from "../../lib/access/types";
 import { getViewer } from "../../lib/auth/viewer";
 
 type FeatureGateProps = {
-  featureKey: FeatureKey;
+  feature?: FeatureKey;
+  featureKey?: FeatureKey;
   children: React.ReactNode;
 };
 
-export async function FeatureGate({ featureKey, children }: FeatureGateProps) {
+export async function FeatureGate({ feature, featureKey, children }: FeatureGateProps) {
+  const resolvedFeature = featureKey ?? feature;
+  if (!resolvedFeature) throw new Error("FeatureGate requires feature or featureKey");
   const viewer = await getViewer();
   const permissions =
     viewer.role === "ADMIN" || viewer.role === "SUPER_ADMIN"
@@ -17,11 +20,11 @@ export async function FeatureGate({ featureKey, children }: FeatureGateProps) {
       : viewer.role === "REVIEWER"
         ? ["catalog-review", ...viewer.permissions]
         : viewer.permissions;
-  const decision = canAccessFeature(viewer, featureKey, { permissions });
+  const decision = canAccessFeature(viewer, resolvedFeature, { permissions });
 
   if (decision.allowed) return <>{children}</>;
 
-  const href = decision.reason === "signin" ? "/signin" : `/upgrade?feature=${featureKey}`;
+  const href = decision.reason === "signin" ? "/signin" : `/upgrade?feature=${resolvedFeature}`;
   const label = decision.reason === "signin" ? "Sign in" : "View upgrade options";
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">

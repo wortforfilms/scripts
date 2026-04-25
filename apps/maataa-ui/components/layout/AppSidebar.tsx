@@ -8,36 +8,67 @@ import {
   Anchor,
   BadgeCheck,
   Cable,
+  Brain,
+  FileAudio,
   FolderKanban,
   GitBranch,
+  Headphones,
   Languages,
   LayoutDashboard,
+  LetterText,
+  ListChecks,
   Network,
+  Package,
   Radio,
   Receipt,
   ScanText,
   ShieldCheck,
-  ShoppingCart
+  ShoppingCart,
+  SpellCheck,
+  Store,
+  TreePine,
+  WandSparkles
 } from "lucide-react";
-import { canAccessFeature } from "../../lib/access/can-access";
-import type { AccessViewer, NavSection } from "../../lib/access/types";
-import { navItems, navSections } from "../../lib/navigation/nav-items";
+import type { AccessViewer } from "../../lib/access/types";
+import { buildNavigation } from "../../lib/navigation/build-navigation";
+import type { ToolCategory } from "../../lib/tools/tool-registry";
 
 const iconMap = {
   Activity,
   Anchor,
   BadgeCheck,
+  Brain,
   Cable,
+  FileAudio,
   FolderKanban,
   GitBranch,
+  Headphones,
   Languages,
   LayoutDashboard,
+  LetterText,
+  ListChecks,
   Network,
+  Package,
   Radio,
   Receipt,
   ScanText,
   ShieldCheck,
-  ShoppingCart
+  ShoppingCart,
+  SpellCheck,
+  Store,
+  TreePine,
+  WandSparkles
+};
+
+const categoryIcon: Record<ToolCategory, keyof typeof iconMap> = {
+  "Script Intelligence": "Languages",
+  "Glyph & Unicode": "LetterText",
+  "Language & Phonetics": "SpellCheck",
+  "Dhwani → Granth": "FileAudio",
+  "Maataa AI": "Brain",
+  "Spine Runtime": "Activity",
+  Marketplace: "Store",
+  Admin: "FolderKanban"
 };
 
 type AppSidebarProps = {
@@ -45,13 +76,8 @@ type AppSidebarProps = {
 };
 
 export function AppSidebar({ viewer }: AppSidebarProps) {
-  const pathname = usePathname();
-  const permissions =
-    viewer.role === "ADMIN" || viewer.role === "SUPER_ADMIN"
-      ? ["catalog-admin", "catalog-review", ...viewer.permissions]
-      : viewer.role === "REVIEWER"
-        ? ["catalog-review", ...viewer.permissions]
-        : viewer.permissions;
+  const pathname = usePathname() ?? "";
+  const sections = buildNavigation(viewer);
 
   return (
     <aside className="min-h-screen w-full border-r border-white/10 bg-black/25 px-4 py-5 md:w-72">
@@ -59,36 +85,34 @@ export function AppSidebar({ viewer }: AppSidebarProps) {
         Maataa Scripts
       </Link>
       <nav className="mt-6 space-y-6">
-        {(Object.keys(navSections) as NavSection[]).map((section) => {
-          const items = navItems.filter((item) => item.section === section);
+        {sections.map((section) => {
           return (
-            <section key={section}>
-              <h2 className="px-2 text-xs font-medium uppercase tracking-wide text-white/40">{navSections[section]}</h2>
+            <section key={section.section}>
+              <h2 className="px-2 text-xs font-medium uppercase tracking-wide text-white/40">{section.section}</h2>
               <div className="mt-2 space-y-1">
-                {items.map((item) => {
-                  const Icon = iconMap[item.icon as keyof typeof iconMap] ?? LayoutDashboard;
-                  const decision = canAccessFeature(viewer, item.featureKey, { permissions });
-                  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                {section.tools.map((item) => {
+                  const Icon = iconMap[categoryIcon[item.category]] ?? LayoutDashboard;
+                  const active = pathname === item.route || pathname.startsWith(`${item.route}/`);
                   const className = [
                     "flex items-center justify-between rounded px-2 py-2 text-sm transition",
                     active ? "bg-white/15 text-white" : "text-white/70",
-                    decision.allowed ? "hover:bg-white/10" : "cursor-not-allowed opacity-55"
+                    !item.locked ? "hover:bg-white/10" : "cursor-not-allowed opacity-55"
                   ].join(" ");
                   const content = (
                     <>
                       <span className="flex min-w-0 items-center gap-2">
                         <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                        <span className="truncate">{item.label}</span>
+                        <span className="truncate">{item.name}</span>
                       </span>
-                      {!decision.allowed ? <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-semibold text-black">Pro</span> : null}
+                      {item.locked ? <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-semibold text-black">Pro</span> : null}
                     </>
                   );
-                  return decision.allowed ? (
-                    <Link key={item.href} href={item.href} className={className}>
+                  return !item.locked ? (
+                    <Link key={item.route} href={item.route} className={className}>
                       {content}
                     </Link>
                   ) : (
-                    <span key={item.href} aria-disabled="true" className={className}>
+                    <span key={item.route} aria-disabled="true" className={className}>
                       {content}
                     </span>
                   );

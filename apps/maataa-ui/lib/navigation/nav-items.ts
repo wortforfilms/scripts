@@ -1,4 +1,6 @@
+import { buildNavigation } from "./build-navigation";
 import type { FeatureKey, NavSection } from "../access/types";
+import type { AccessViewer } from "../access/types";
 
 export type NavItem = {
   label: string;
@@ -32,3 +34,24 @@ export const navSections: Record<NavSection, string> = {
   system: "System",
   admin: "Admin"
 };
+
+const sectionMap: Record<string, NavSection> = {
+  Explore: "main",
+  Build: "main",
+  Learn: "learn",
+  Marketplace: "market",
+  Maataa: "system",
+  Admin: "admin"
+};
+
+export function navItemsForViewer(viewer: AccessViewer): NavItem[] {
+  return buildNavigation(viewer).flatMap((section) =>
+    section.tools.map((tool) => ({
+      label: tool.name,
+      href: tool.route,
+      icon: "LayoutDashboard",
+      featureKey: tool.featureKey,
+      section: sectionMap[section.section] ?? "main"
+    }))
+  );
+}

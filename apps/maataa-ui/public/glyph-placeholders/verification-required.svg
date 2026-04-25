@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">Glyph verification required</title>
+  <desc id="desc">A neutral placeholder used when a script glyph is not yet verified.</desc>
+  <rect width="160" height="160" rx="18" fill="#101820"/>
+  <path d="M35 122h90M48 38h64M58 38v84M102 38v84" fill="none" stroke="#facc15" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="80" cy="80" r="24" fill="none" stroke="#f8fafc" stroke-width="7"/>
+  <path d="m65 95 30-30" stroke="#f8fafc" stroke-width="7" stroke-linecap="round"/>
+</svg>

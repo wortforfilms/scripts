@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/verified-scripts.seed.ts",
     "./schema": "./src/script.schema.ts",
+    "./phase1-unicode": "./src/phase1-unicode-scripts.ts",
     "./kharosthi-chain": "./src/kharosthi-chain.ts",
     "./qa": "./src/qa.ts",
     "./validate": "./src/validate-scripts.ts"

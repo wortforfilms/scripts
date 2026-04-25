@@ -1,7 +1,8 @@
 import { assertValidScripts, type ScriptRecord } from "./script.schema";
 import { kharosthiChain } from "./kharosthi-chain";
+import { phase1UnicodeDatasetMeta, phase1UnicodeScriptsSeed } from "./phase1-unicode-scripts";
 
-export const verifiedScriptsSeed: ScriptRecord[] = [
+const curatedScripts: ScriptRecord[] = [
   {
     id: "latin",
     slug: "latin",
@@ -69,6 +70,13 @@ export const verifiedScriptsSeed: ScriptRecord[] = [
   ...kharosthiChain
 ];
 
+const curatedById = new Map(curatedScripts.map((script) => [script.id, script]));
+
+export const verifiedScriptsSeed: ScriptRecord[] = [
+  ...phase1UnicodeScriptsSeed.map((script) => curatedById.get(script.id) ?? script),
+  ...curatedScripts.filter((script) => !phase1UnicodeScriptsSeed.some((phaseScript) => phaseScript.id === script.id))
+];
+
 assertValidScripts(verifiedScriptsSeed);
 
 export const SCRIPT_DATASET_TARGET_COUNT = 426;
@@ -77,7 +85,9 @@ export function scriptDatasetStatus() {
   return {
     target: SCRIPT_DATASET_TARGET_COUNT,
     current: verifiedScriptsSeed.length,
+    phase1Current: phase1UnicodeDatasetMeta.count,
+    phase1Status: phase1UnicodeDatasetMeta.status,
     complete: verifiedScriptsSeed.length >= SCRIPT_DATASET_TARGET_COUNT,
-    note: "Only verified or explicitly partial records are seeded. Missing scripts remain excluded until source verification."
+    note: "Phase 1 uses Unicode Script property values plus curated verified overlays. Missing scripts remain excluded until source verification."
   };
 }

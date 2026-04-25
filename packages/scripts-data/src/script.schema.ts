@@ -1,4 +1,4 @@
-export type ScriptDirection = "LTR" | "RTL" | "TTB" | "BTT";
+export type ScriptDirection = "LTR" | "RTL" | "TTB" | "BTT" | "MIXED";
 
 export type VerificationStatus = "UNVERIFIED" | "PARTIAL" | "VERIFIED";
 
@@ -11,7 +11,7 @@ export type ScriptRecord = {
   fallbackGlyphAsset: string;
   family: string;
   parentId: string | null;
-  region: string;
+  region: string | null;
   eraStart: number | null;
   eraEnd: number | null;
   direction: ScriptDirection;
@@ -19,7 +19,7 @@ export type ScriptRecord = {
   sources: string[];
 };
 
-const directions = new Set<ScriptDirection>(["LTR", "RTL", "TTB", "BTT"]);
+const directions = new Set<ScriptDirection>(["LTR", "RTL", "TTB", "BTT", "MIXED"]);
 const statuses = new Set<VerificationStatus>(["UNVERIFIED", "PARTIAL", "VERIFIED"]);
 
 export function validateScriptRecord(script: ScriptRecord): string[] {
@@ -30,7 +30,7 @@ export function validateScriptRecord(script: ScriptRecord): string[] {
   if (!script.nativeName.trim()) errors.push(`${script.id}: nativeName is required`);
   if (!script.fallbackGlyphAsset.trim()) errors.push(`${script.id}: fallbackGlyphAsset is required`);
   if (!script.family.trim()) errors.push(`${script.id}: family is required`);
-  if (!script.region.trim()) errors.push(`${script.id}: region is required`);
+  if (script.region !== null && !script.region.trim()) errors.push(`${script.id}: region must be non-empty when provided`);
   if (!directions.has(script.direction)) errors.push(`${script.id}: invalid direction`);
   if (!statuses.has(script.verificationStatus)) errors.push(`${script.id}: invalid verificationStatus`);
   if (script.verificationStatus === "VERIFIED" && !script.verifiedUnicodeSample?.trim()) {
