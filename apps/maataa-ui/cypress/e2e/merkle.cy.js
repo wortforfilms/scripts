@@ -1,5 +1,6 @@
 describe("Merkle traversal", () => {
   it("renders runtime leaves and steps through a selected event path", () => {
+    cy.loginAsPremiumUser();
     cy.intercept("GET", "/api/runtime/timeline", { fixture: "timeline-sample.json" }).as("timeline");
 
     cy.visit("/merkle");

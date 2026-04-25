@@ -1,5 +1,6 @@
 describe("Proof inspector flows", () => {
   it("loads an HKD fixture, verifies it, and animates a proof path", () => {
+    cy.loginAsPremiumUser();
     cy.visit("/proof-inspector");
 
     cy.contains("Proof Inspector").should("be.visible");
