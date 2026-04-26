@@ -100,7 +100,7 @@ export function ScriptCatalogBrowser({ scripts, targetCount }: ScriptCatalogBrow
   const selectClass = "rounded border border-white/15 bg-black/25 px-3 py-2 text-sm text-white";
 
   return (
-    <section data-joyride="script-catalog-browser" className="mt-8">
+    <section id="script-catalog" data-joyride="script-catalog-browser" className="mt-8 scroll-mt-24">
       <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded border border-white/10 bg-white/5 p-4">
           <p className="text-sm text-white/55">Catalog</p>

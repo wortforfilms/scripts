@@ -1,4 +1,5 @@
 import { ScriptCatalogBrowser } from "../../components/scripts/ScriptCatalogBrowser";
+import { ScriptNavigationScreen } from "../../components/scripts/ScriptNavigationScreen";
 import { scriptDatasetStatus, verifiedScriptsSeed } from "../../lib/script-data";
 
 export const metadata = {
@@ -23,6 +24,7 @@ export default function ScriptsIndexPage() {
         </div>
       </div>
 
+      <ScriptNavigationScreen scripts={verifiedScriptsSeed} targetCount={dataset.target} />
       <ScriptCatalogBrowser scripts={verifiedScriptsSeed} targetCount={dataset.target} />
     </main>
   );
