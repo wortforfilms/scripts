@@ -14,6 +14,7 @@ RUN pnpm install --no-frozen-lockfile
 
 COPY . .
 
+RUN mkdir -p .maataa-data
 RUN pnpm --filter @maataa/maataa-ui build
 
 EXPOSE 3000
