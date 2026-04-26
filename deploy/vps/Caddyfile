@@ -2,7 +2,11 @@
 	email {$ACME_EMAIL}
 }
 
-{$APP_DOMAIN} {
+{$WWW_DOMAIN} {
+	redir https://{$APP_DOMAIN}{uri} permanent
+}
+
+{$APP_SITE_ADDRESSES} {
 	encode zstd gzip
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
@@ -13,7 +17,7 @@
 	reverse_proxy maataa-ui:3000
 }
 
-{$RADIO_DOMAIN} {
+{$RADIO_SITE_ADDRESSES} {
 	encode zstd gzip
 	header {
 		X-Content-Type-Options "nosniff"
