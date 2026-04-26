@@ -19,4 +19,4 @@ RUN RUNTIME_DATABASE_URL=file:/tmp/maataa-build-runtime.db pnpm --filter @maataa
 
 EXPOSE 3000
 
-CMD ["pnpm", "--filter", "@maataa/maataa-ui", "start", "--", "-H", "0.0.0.0", "-p", "3000"]
+CMD ["pnpm", "--filter", "@maataa/maataa-ui", "exec", "next", "start", "-H", "0.0.0.0", "-p", "3000"]
