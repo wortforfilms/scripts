@@ -11,6 +11,9 @@ apps/maataa-ui/tsconfig.tsbuildinfo
 .env.local
 .env.offline
 data/
+!packages/scripts-data/src/data/
+!packages/scripts-data/src/data/phase1-unicode-script-dataset.json
+!packages/scripts-data/src/data/unicode-scripts-full.json
 logs/
 *.log
 .DS_Store
