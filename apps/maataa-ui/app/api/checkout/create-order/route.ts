@@ -3,6 +3,7 @@ import { requireFeature, requireUser, routeError } from "../../../../lib/auth";
 import { createPendingOrder, quoteSkus } from "../../../../lib/catalog-db";
 import { parseCheckoutRequest } from "../../../../lib/forms/schemas";
 import { createRazorpayTestOrder } from "../../../../lib/payments/razorpay";
+import { createUpiPaymentIntent } from "../../../../lib/payments/upi";
 
 export async function POST(request: Request) {
   try {
@@ -11,12 +12,31 @@ export async function POST(request: Request) {
     const parsed = parseCheckoutRequest(await request.json());
     if (!parsed.ok) throw new Error(parsed.error);
     const quote = await quoteSkus(parsed.value.skuIds);
+    if (parsed.value.paymentMethod === "UPI_MANUAL") {
+      const upi = createUpiPaymentIntent({
+        amountInPaise: quote.amountInPaise,
+        currency: quote.currency,
+        note: "Maataa Scripts digital access"
+      });
+      const order = await createPendingOrder({
+        userId: user.id,
+        skuIds: parsed.value.skuIds,
+        provider: "upi_manual",
+        providerOrderId: upi.providerOrderId,
+        paymentReference: upi.reference
+      });
+      return NextResponse.json({
+        order,
+        upi,
+        message: "UPI order created. Access unlocks only after server-side/admin payment verification."
+      });
+    }
     const razorpayOrder = await createRazorpayTestOrder({
       amountInPaise: quote.amountInPaise,
       currency: quote.currency,
       receipt: `maataa_${crypto.randomUUID().slice(0, 18)}`
     });
-    const order = await createPendingOrder({ userId: user.id, skuIds: parsed.value.skuIds, razorpayOrderId: razorpayOrder.id });
+    const order = await createPendingOrder({ userId: user.id, skuIds: parsed.value.skuIds, provider: "razorpay", providerOrderId: razorpayOrder.id });
     return NextResponse.json({
       order,
       razorpay: {

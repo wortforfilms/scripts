@@ -10,6 +10,7 @@ import {
 } from "./catalog-policy";
 import { createRevenueSplitLedger, ensureRevenueDb } from "./revenue/create-ledger";
 import { recordSpineEvent } from "./spine";
+import { recordAudit } from "./logging/audit";
 
 export type CatalogSku = {
   id: string;
@@ -21,6 +22,8 @@ export type CatalogSku = {
   publishStatus: PublishStatus;
   isActive: boolean;
 };
+
+export type PaymentProvider = "razorpay" | "upi_manual";
 
 export async function quoteSkus(skuIds: string[]) {
   const publicSkus = await listSkus(true);
@@ -34,6 +37,16 @@ export async function quoteSkus(skuIds: string[]) {
 }
 
 let catalogInitialized = false;
+
+async function hasColumn(tableName: string, columnName: string) {
+  const result = await runtimeDb.execute(`PRAGMA table_info(${tableName})`);
+  return result.rows.some((row) => String(row.name) === columnName);
+}
+
+async function addColumnIfMissing(tableName: string, columnName: string, definition: string) {
+  if (await hasColumn(tableName, columnName)) return;
+  await runtimeDb.execute(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+}
 
 export async function ensureCatalogDb() {
   if (catalogInitialized) return;
@@ -70,12 +83,19 @@ export async function ensureCatalogDb() {
       status TEXT NOT NULL,
       amount_in_paise INTEGER NOT NULL,
       currency TEXT NOT NULL,
+      payment_provider TEXT NOT NULL DEFAULT 'razorpay',
+      provider_order_id TEXT UNIQUE,
+      payment_reference TEXT,
       razorpay_order_id TEXT UNIQUE,
       items_json TEXT NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
   `);
+  await addColumnIfMissing("orders", "payment_provider", "TEXT NOT NULL DEFAULT 'razorpay'");
+  await addColumnIfMissing("orders", "provider_order_id", "TEXT");
+  await addColumnIfMissing("orders", "payment_reference", "TEXT");
+  await runtimeDb.execute("CREATE UNIQUE INDEX IF NOT EXISTS orders_provider_order_id_unique ON orders(provider_order_id)");
   await runtimeDb.execute(`
     CREATE TABLE IF NOT EXISTS payments (
       id TEXT PRIMARY KEY,
@@ -118,6 +138,21 @@ export async function ensureCatalogDb() {
       failed_count INTEGER NOT NULL,
       errors_json TEXT NOT NULL,
       created_at TEXT NOT NULL
+    )
+  `);
+  await runtimeDb.execute(`
+    CREATE TABLE IF NOT EXISTS upi_reconciliations (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      verified_by TEXT NOT NULL,
+      reference TEXT NOT NULL,
+      proof_url TEXT,
+      note TEXT,
+      status TEXT NOT NULL,
+      approved_by TEXT,
+      approved_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     )
   `);
   await ensureRevenueDb();
@@ -221,20 +256,29 @@ export async function transitionSku(id: string, action: "submit-review" | "appro
   return updated;
 }
 
-export async function createPendingOrder(input: { userId: string; skuIds: string[]; razorpayOrderId?: string }) {
+export async function createPendingOrder(input: {
+  userId: string;
+  skuIds: string[];
+  provider?: PaymentProvider;
+  providerOrderId?: string;
+  paymentReference?: string | null;
+  razorpayOrderId?: string;
+}) {
   await ensureCatalogDb();
   const quote = await quoteSkus(input.skuIds);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
-  const razorpayOrderId = input.razorpayOrderId ?? `order_test_${id.replaceAll("-", "").slice(0, 18)}`;
+  const provider = input.provider ?? "razorpay";
+  const providerOrderId = input.providerOrderId ?? input.razorpayOrderId ?? `${provider}_${id.replaceAll("-", "").slice(0, 18)}`;
+  const razorpayOrderId = provider === "razorpay" ? providerOrderId : null;
   await runtimeDb.execute({
     sql: `
-      INSERT INTO orders (id, user_id, status, amount_in_paise, currency, razorpay_order_id, items_json, created_at, updated_at)
-      VALUES (?, ?, 'PENDING_PAYMENT', ?, 'INR', ?, ?, ?, ?)
+      INSERT INTO orders (id, user_id, status, amount_in_paise, currency, payment_provider, provider_order_id, payment_reference, razorpay_order_id, items_json, created_at, updated_at)
+      VALUES (?, ?, 'PENDING_PAYMENT', ?, 'INR', ?, ?, ?, ?, ?, ?, ?)
     `,
-    args: [id, input.userId, quote.amountInPaise, razorpayOrderId, JSON.stringify(quote.items), now, now]
+    args: [id, input.userId, quote.amountInPaise, provider, providerOrderId, input.paymentReference ?? null, razorpayOrderId, JSON.stringify(quote.items), now, now]
   });
-  return { id, razorpayOrderId, amountInPaise: quote.amountInPaise, currency: quote.currency, items: quote.items };
+  return { id, provider, providerOrderId, paymentReference: input.paymentReference ?? null, razorpayOrderId, amountInPaise: quote.amountInPaise, currency: quote.currency, items: quote.items };
 }
 
 export async function markOrderPaidFromWebhook(input: {
@@ -253,6 +297,12 @@ export async function markOrderPaidFromWebhook(input: {
     args: [crypto.randomUUID(), input.eventId, typeof eventType === "string" ? eventType : "unknown", new Date().toISOString()]
   });
   if (eventResult.rowsAffected === 0) {
+    await recordAudit({
+      action: "PAYMENT_WEBHOOK_DUPLICATE",
+      subjectId: input.razorpayOrderId,
+      severity: "WARN",
+      payload: { provider: "razorpay", eventId: input.eventId }
+    });
     return { duplicate: true, orderId: null, unlocked: 0, ledgerEntries: 0 };
   }
 
@@ -274,6 +324,11 @@ export async function markOrderPaidFromWebhook(input: {
     args: [paymentId, String(order.id), input.razorpayPaymentId, input.razorpayOrderId, JSON.stringify(input.rawEvent), now, now]
   });
   await recordSpineEvent({ eventType: "ORDER_PAID", subjectId: String(order.id), payload: { provider: "razorpay" } });
+  await recordAudit({
+    action: "PAYMENT_CAPTURED",
+    subjectId: String(order.id),
+    payload: { provider: "razorpay", eventId: input.eventId, paymentId: input.razorpayPaymentId }
+  });
   const items = JSON.parse(String(order.items_json)) as CatalogSku[];
   for (const item of items) {
     await runtimeDb.execute({
@@ -290,6 +345,163 @@ export async function markOrderPaidFromWebhook(input: {
     productIds: items.map((item) => item.productId)
   });
   return { duplicate: false, orderId: String(order.id), unlocked: items.length, ledgerEntries: ledger.length };
+}
+
+export async function verifyUpiReconciliation(input: {
+  orderId: string;
+  reference: string;
+  proofUrl?: string | null;
+  actorId: string;
+  note?: string;
+}) {
+  await ensureCatalogDb();
+  const reference = input.reference.trim();
+  const proofUrl = input.proofUrl?.trim() ?? "";
+  if (!reference) throw new Error("UPI reference is required");
+  if (!proofUrl) throw new Error("UPI proof URL is required");
+  const orderResult = await runtimeDb.execute({
+    sql: "SELECT id, status, payment_provider FROM orders WHERE id = ?",
+    args: [input.orderId]
+  });
+  const order = orderResult.rows[0];
+  if (!order) throw new Error("Order not found");
+  if (String(order.payment_provider) !== "upi_manual") throw new Error("Order is not a manual UPI order");
+  if (String(order.status) !== "PENDING_PAYMENT") throw new Error("Only pending UPI orders can be verified");
+
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  await runtimeDb.execute({
+    sql: `
+      INSERT INTO upi_reconciliations (id, order_id, verified_by, reference, proof_url, note, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'VERIFIED', ?, ?)
+    `,
+    args: [id, input.orderId, input.actorId, reference, proofUrl, input.note ?? null, now, now]
+  });
+  await recordAudit({
+    action: "UPI_RECONCILIATION_VERIFIED",
+    actorId: input.actorId,
+    subjectId: input.orderId,
+    payload: { reconciliationId: id, reference, proofUrl }
+  });
+  await recordSpineEvent({ eventType: "UPI_RECONCILIATION_VERIFIED", actorId: input.actorId, subjectId: input.orderId, payload: { reconciliationId: id } });
+  return { id, orderId: input.orderId, status: "VERIFIED" as const };
+}
+
+export async function approveUpiReconciliation(input: { reconciliationId: string; actorId: string; note?: string }) {
+  await ensureCatalogDb();
+  const reconciliationResult = await runtimeDb.execute({
+    sql: "SELECT id, order_id, reference, status FROM upi_reconciliations WHERE id = ?",
+    args: [input.reconciliationId]
+  });
+  const reconciliation = reconciliationResult.rows[0];
+  if (!reconciliation) throw new Error("UPI reconciliation not found");
+  if (String(reconciliation.status) !== "VERIFIED") throw new Error("UPI reconciliation must be VERIFIED before approval");
+  const orderResult = await runtimeDb.execute({
+    sql: "SELECT id, user_id, status, amount_in_paise, currency, items_json, payment_provider, provider_order_id, payment_reference FROM orders WHERE id = ?",
+    args: [String(reconciliation.order_id)]
+  });
+  const order = orderResult.rows[0];
+  if (!order) throw new Error("Order not found");
+  if (String(order.payment_provider) !== "upi_manual") throw new Error("Order is not a manual UPI order");
+  if (String(order.status) === "PAID") return { duplicate: true, orderId: String(order.id), unlocked: 0, ledgerEntries: 0 };
+
+  const now = new Date().toISOString();
+  await runtimeDb.execute({
+    sql: "UPDATE upi_reconciliations SET status = 'APPROVED', approved_by = ?, approved_at = ?, note = COALESCE(?, note), updated_at = ? WHERE id = ?",
+    args: [input.actorId, now, input.note ?? null, now, input.reconciliationId]
+  });
+  await runtimeDb.execute({ sql: "UPDATE orders SET status = 'PAID', updated_at = ? WHERE id = ?", args: [now, String(order.id)] });
+  const paymentId = crypto.randomUUID();
+  await runtimeDb.execute({
+    sql: `
+      INSERT INTO payments (id, order_id, provider, provider_payment_id, provider_order_id, status, signature_verified, raw_event_json, created_at, updated_at)
+      VALUES (?, ?, 'upi_manual', ?, ?, 'CAPTURED', 1, ?, ?, ?)
+    `,
+    args: [
+      paymentId,
+      String(order.id),
+      String(reconciliation.reference),
+      String(order.provider_order_id),
+      JSON.stringify({
+        approvedBy: input.actorId,
+        provider: "upi_manual",
+        reconciliationId: input.reconciliationId,
+        reference: order.payment_reference ? String(order.payment_reference) : null,
+        note: input.note ?? null
+      }),
+      now,
+      now
+    ]
+  });
+  await recordSpineEvent({ eventType: "ORDER_PAID", actorId: input.actorId, subjectId: String(order.id), payload: { provider: "upi_manual" } });
+  await recordAudit({
+    action: "UPI_RECONCILIATION_APPROVED",
+    actorId: input.actorId,
+    subjectId: String(order.id),
+    payload: { reconciliationId: input.reconciliationId, reference: reconciliation.reference ? String(reconciliation.reference) : null }
+  });
+  await recordSpineEvent({ eventType: "UPI_RECONCILIATION_APPROVED", actorId: input.actorId, subjectId: String(order.id), payload: { reconciliationId: input.reconciliationId } });
+  const items = JSON.parse(String(order.items_json)) as CatalogSku[];
+  for (const item of items) {
+    await runtimeDb.execute({
+      sql: "INSERT OR IGNORE INTO user_access (id, user_id, product_id, order_id, granted_at) VALUES (?, ?, ?, ?, ?)",
+      args: [crypto.randomUUID(), String(order.user_id), item.productId, String(order.id), now]
+    });
+    await recordSpineEvent({ eventType: "ACCESS_UNLOCKED", actorId: input.actorId, subjectId: item.productId, payload: { orderId: String(order.id), provider: "upi_manual" } });
+  }
+  const ledger = await createRevenueSplitLedger({
+    orderId: String(order.id),
+    paymentId,
+    amountInPaise: Number(order.amount_in_paise),
+    currency: String(order.currency),
+    productIds: items.map((item) => item.productId)
+  });
+  return { duplicate: false, orderId: String(order.id), unlocked: items.length, ledgerEntries: ledger.length };
+}
+
+export async function rejectUpiReconciliation(input: { reconciliationId: string; actorId: string; note: string }) {
+  await ensureCatalogDb();
+  if (!input.note.trim()) throw new Error("Rejection note is required");
+  const result = await runtimeDb.execute({
+    sql: "UPDATE upi_reconciliations SET status = 'REJECTED', note = ?, updated_at = ? WHERE id = ? AND status = 'VERIFIED'",
+    args: [input.note.trim(), new Date().toISOString(), input.reconciliationId]
+  });
+  if (result.rowsAffected === 0) throw new Error("Only VERIFIED UPI reconciliations can be rejected");
+  await recordAudit({
+    action: "UPI_RECONCILIATION_REJECTED",
+    actorId: input.actorId,
+    subjectId: input.reconciliationId,
+    severity: "WARN",
+    payload: { note: input.note.trim() }
+  });
+  await recordSpineEvent({ eventType: "UPI_RECONCILIATION_REJECTED", actorId: input.actorId, subjectId: input.reconciliationId, payload: { note: input.note.trim() } });
+  return { id: input.reconciliationId, status: "REJECTED" as const };
+}
+
+export async function listUpiReconciliations(limit = 50) {
+  await ensureCatalogDb();
+  const result = await runtimeDb.execute({
+    sql: `
+      SELECT id, order_id, verified_by, reference, proof_url, note, status, approved_by, approved_at, created_at, updated_at
+      FROM upi_reconciliations
+      ORDER BY created_at DESC
+      LIMIT ?
+    `,
+    args: [limit]
+  });
+  return result.rows.map((row) => ({
+    id: String(row.id),
+    orderId: String(row.order_id),
+    verifiedBy: String(row.verified_by),
+    reference: String(row.reference),
+    proofUrl: row.proof_url ? String(row.proof_url) : null,
+    note: row.note ? String(row.note) : null,
+    status: String(row.status),
+    approvedBy: row.approved_by ? String(row.approved_by) : null,
+    approvedAt: row.approved_at ? String(row.approved_at) : null,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at)
+  }));
 }
 
 export async function recordFontQaRun(input: { ok: boolean; checkedCount: number; errors: string[] }) {
@@ -340,7 +552,7 @@ export async function listUserAccess(userId: string) {
 export async function listFinanceSummary() {
   await ensureCatalogDb();
   const orders = await runtimeDb.execute(`
-    SELECT id, user_id, status, amount_in_paise, currency, razorpay_order_id, created_at, updated_at
+    SELECT id, user_id, status, amount_in_paise, currency, payment_provider, provider_order_id, payment_reference, razorpay_order_id, created_at, updated_at
     FROM orders
     ORDER BY created_at DESC
     LIMIT 50
@@ -363,6 +575,7 @@ export async function listFinanceSummary() {
     ORDER BY granted_at DESC
     LIMIT 50
   `);
+  const upiReconciliations = await listUpiReconciliations();
   return {
     orders: orders.rows.map((row) => ({
       id: String(row.id),
@@ -370,6 +583,9 @@ export async function listFinanceSummary() {
       status: String(row.status),
       amountInPaise: Number(row.amount_in_paise),
       currency: String(row.currency),
+      paymentProvider: row.payment_provider ? String(row.payment_provider) : "razorpay",
+      providerOrderId: row.provider_order_id ? String(row.provider_order_id) : null,
+      paymentReference: row.payment_reference ? String(row.payment_reference) : null,
       razorpayOrderId: row.razorpay_order_id ? String(row.razorpay_order_id) : null,
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at)
@@ -394,6 +610,7 @@ export async function listFinanceSummary() {
       productId: String(row.product_id),
       orderId: String(row.order_id),
       grantedAt: String(row.granted_at)
-    }))
+    })),
+    upiReconciliations
   };
 }

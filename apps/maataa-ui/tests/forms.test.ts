@@ -30,7 +30,11 @@ describe("form schemas", () => {
     });
     expect(parseCheckoutRequest({ skuIds: ["sku_1"], acceptedLegal: true })).toEqual({
       ok: true,
-      value: { skuIds: ["sku_1"], acceptedLegal: true }
+      value: { skuIds: ["sku_1"], acceptedLegal: true, paymentMethod: "RAZORPAY" }
+    });
+    expect(parseCheckoutRequest({ skuIds: ["sku_1"], acceptedLegal: true, paymentMethod: "UPI_MANUAL" })).toEqual({
+      ok: true,
+      value: { skuIds: ["sku_1"], acceptedLegal: true, paymentMethod: "UPI_MANUAL" }
     });
   });
 });

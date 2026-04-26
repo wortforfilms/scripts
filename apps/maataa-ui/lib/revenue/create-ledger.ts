@@ -1,5 +1,6 @@
 import { runtimeDb } from "../runtime-db";
 import { recordSpineEvent } from "../spine";
+import { recordAudit } from "../logging/audit";
 import { calculateSplits, type RevenueSplitRule } from "./calculate-splits";
 
 let revenueInitialized = false;
@@ -90,6 +91,11 @@ export async function createRevenueSplitLedger(input: {
     eventType: "REVENUE_SPLIT_CREATED",
     subjectId: input.orderId,
     payload: { splitCount: splits.length, transferStatus: "PENDING_ADMIN_APPROVAL" }
+  });
+  await recordAudit({
+    action: "REVENUE_SPLIT_CREATED",
+    subjectId: input.orderId,
+    payload: { splitCount: splits.length, transferStatus: "PENDING_ADMIN_APPROVAL", amountInPaise: input.amountInPaise, currency: input.currency }
   });
   return splits;
 }

@@ -5,9 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { assertDatasetQa, runDatasetQa } from "../../../packages/scripts-data/src/qa";
 import { verifiedScriptsSeed } from "../../../packages/scripts-data/src/verified-scripts.seed";
 import { assertGlyphQa } from "../lib/glyph-qa";
-import { buildReleaseMatrix } from "../lib/release-matrix";
+import { evaluateSystemStatus } from "../lib/release/status-matrix";
 import { createSessionTokenForTests, verifySessionToken } from "../lib/auth/session";
 import { calculateSplits } from "../lib/revenue/calculate-splits";
+import { createUpiPaymentIntent } from "../lib/payments/upi";
 
 describe("launch validation: auth provider", () => {
   it("accepts signed production session JWTs and rejects tampering", async () => {
@@ -142,6 +143,84 @@ describe("launch validation: Razorpay local test-mode E2E", () => {
   }, 20_000);
 });
 
+describe("launch validation: own UPI manual reconciliation", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    process.env.UPI_PAYEE_VPA = "maataa-test@upi";
+    process.env.UPI_PAYEE_NAME = "Maataa Scripts Test";
+    process.env.RUNTIME_DATABASE_URL = `file:${join(tmpdir(), `maataa-upi-${randomUUID()}.db`)}`;
+    delete process.env.RUNTIME_DATABASE_AUTH_TOKEN;
+  });
+
+  it("creates a UPI intent but unlocks access only after admin verification", async () => {
+    const { runtimeDb } = await import("../lib/runtime-db");
+    const { ensureCatalogDb, createPendingOrder, listUserAccess, verifyUpiReconciliation, approveUpiReconciliation } = await import("../lib/catalog-db");
+    const { listRevenueLedger } = await import("../lib/revenue/create-ledger");
+    await ensureCatalogDb();
+
+    const now = new Date().toISOString();
+    await runtimeDb.execute({
+      sql: `
+        INSERT INTO products (id, slug, title, description, product_type, publish_status, is_paid, price_in_paise, currency, created_at, updated_at)
+        VALUES ('prod_upi', 'upi-product', 'UPI Product', 'Manual UPI validation product', 'digital', 'PUBLISHED', 1, 9900, 'INR', ?, ?)
+      `,
+      args: [now, now]
+    });
+    await runtimeDb.execute({
+      sql: `
+        INSERT INTO skus (id, code, product_id, publish_status, is_active, created_at, updated_at)
+        VALUES ('sku_upi', 'SKU-UPI', 'prod_upi', 'PUBLISHED', 1, ?, ?)
+      `,
+      args: [now, now]
+    });
+
+    const upi = createUpiPaymentIntent({ amountInPaise: 9900, currency: "INR", orderId: "upi_test_order" });
+    expect(upi.upiUri).toContain("upi://pay?");
+    expect(upi.upiUri).toContain("pa=maataa-test%40upi");
+    const order = await createPendingOrder({
+      userId: "user_upi",
+      skuIds: ["sku_upi"],
+      provider: "upi_manual",
+      providerOrderId: upi.providerOrderId,
+      paymentReference: upi.reference
+    });
+
+    await expect(listUserAccess("user_upi")).resolves.toEqual([]);
+    await expect(verifyUpiReconciliation({
+      orderId: order.id,
+      reference: "UPI-TXN-123",
+      proofUrl: "",
+      actorId: "admin_upi"
+    })).rejects.toThrow("proof URL");
+    await expect(listUserAccess("user_upi")).resolves.toEqual([]);
+
+    await expect(approveUpiReconciliation({
+      reconciliationId: "missing-reconciliation",
+      actorId: "admin_upi"
+    })).rejects.toThrow("not found");
+
+    const verification = await verifyUpiReconciliation({
+      orderId: order.id,
+      reference: "UPI-TXN-123",
+      proofUrl: "https://proof.local/upi-txn-123.png",
+      actorId: "admin_upi"
+    });
+    await expect(listUserAccess("user_upi")).resolves.toEqual([]);
+
+    const result = await approveUpiReconciliation({
+      reconciliationId: verification.id,
+      actorId: "admin_approver"
+    });
+    expect(result).toMatchObject({ duplicate: false, unlocked: 1, ledgerEntries: 1 });
+    await expect(listUserAccess("user_upi")).resolves.toEqual([
+      expect.objectContaining({ productId: "prod_upi", orderId: order.id })
+    ]);
+    await expect(listRevenueLedger(order.id)).resolves.toEqual([
+      expect.objectContaining({ orderId: order.id, party: "PLATFORM", transferStatus: "PENDING_ADMIN_APPROVAL" })
+    ]);
+  });
+});
+
 describe("launch validation: revenue splits", () => {
   it("rejects split rules that do not total 10000 basis points", () => {
     expect(() => calculateSplits(1000, [{ party: "PLATFORM", accountId: null, basisPoints: 9000 }])).toThrow("10000");
@@ -161,23 +240,35 @@ describe("launch validation: revenue splits", () => {
 });
 
 describe("launch validation: release matrix", () => {
-  it("keeps paid marketplace NO-GO unless Razorpay E2E and auth are ready", () => {
-    const matrix = buildReleaseMatrix({
+  it("keeps paid marketplace NO-GO unless Razorpay E2E and auth are ready", async () => {
+    const matrix = await evaluateSystemStatus({
+      testsPass: true,
+      authWorks: true,
+      navigationWorks: true,
       datasetQaPassed: true,
       glyphQaPassed: true,
-      razorpayE2ePassed: false,
-      authProviderConfigured: true
+      noUnknownCriticalFields: true,
+      razorpayWebhookVerified: false,
+      paymentAccessFlowTested: false,
+      revenueSplitCreated: false,
+      upiAuditEnabled: true
     });
-    expect(matrix.find((gate) => gate.gate === "Paid Marketplace")?.status).toBe("NO-GO");
+    expect(matrix.paidMarketplace).toBe("NO-GO");
   });
 
-  it("keeps public preview NO-GO unless dataset and glyph QA pass", () => {
-    const matrix = buildReleaseMatrix({
+  it("keeps public preview NO-GO unless dataset and glyph QA pass", async () => {
+    const matrix = await evaluateSystemStatus({
+      testsPass: true,
+      authWorks: true,
+      navigationWorks: true,
       datasetQaPassed: false,
       glyphQaPassed: true,
-      razorpayE2ePassed: true,
-      authProviderConfigured: true
+      noUnknownCriticalFields: true,
+      razorpayWebhookVerified: true,
+      paymentAccessFlowTested: true,
+      revenueSplitCreated: true,
+      upiAuditEnabled: true
     });
-    expect(matrix.find((gate) => gate.gate === "Public Preview")?.status).toBe("NO-GO");
+    expect(matrix.publicPreview).toBe("NO-GO");
   });
 });

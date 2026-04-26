@@ -22,7 +22,7 @@ export default async function AdminFinancePage() {
           <Metric label="Orders" value={summary.orders.length} />
           <Metric label="Payments" value={summary.payments.length} />
           <Metric label="Webhook events" value={summary.webhooks.length} />
-          <Metric label="Ledger rows" value={ledger.length} />
+          <Metric label="UPI reconciliations" value={summary.upiReconciliations.length} />
         </div>
         <Section title="Revenue split ledger">
           {ledger.map((row) => (
@@ -31,7 +31,12 @@ export default async function AdminFinancePage() {
         </Section>
         <Section title="Orders">
           {summary.orders.map((row) => (
-            <Row key={row.id} title={`${row.status} · ${row.amountInPaise} ${row.currency}`} detail={`${row.id} · ${row.razorpayOrderId ?? "no provider order"}`} />
+            <Row key={row.id} title={`${row.status} · ${row.amountInPaise} ${row.currency}`} detail={`${row.id} · ${row.paymentProvider} · ${row.providerOrderId ?? row.razorpayOrderId ?? "no provider order"}`} />
+          ))}
+        </Section>
+        <Section title="UPI reconciliations">
+          {summary.upiReconciliations.map((row) => (
+            <Row key={row.id} title={`${row.status} · ${row.reference}`} detail={`${row.orderId} · proof ${row.proofUrl ?? "missing"} · ${row.createdAt}`} />
           ))}
         </Section>
         <Section title="Webhook idempotency">

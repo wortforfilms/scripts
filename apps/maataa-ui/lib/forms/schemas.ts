@@ -84,14 +84,17 @@ export function parseGenerateSkuForm(formData: FormData): FormParseResult<Genera
 export type CheckoutRequest = {
   skuIds: string[];
   acceptedLegal: boolean;
+  paymentMethod: "RAZORPAY" | "UPI_MANUAL";
 };
 
 export function parseCheckoutRequest(input: unknown): FormParseResult<CheckoutRequest> {
-  const body = input as { skuIds?: unknown; acceptedLegal?: unknown };
+  const body = input as { skuIds?: unknown; acceptedLegal?: unknown; paymentMethod?: unknown };
   if (!Array.isArray(body.skuIds) || body.skuIds.some((sku) => typeof sku !== "string")) {
     return { ok: false, error: "Cart contains invalid SKU ids" };
   }
   if (body.skuIds.length === 0) return { ok: false, error: "Cart is empty" };
   if (body.acceptedLegal !== true) return { ok: false, error: "Terms, Refund Policy, and Digital License must be accepted" };
-  return { ok: true, value: { skuIds: body.skuIds, acceptedLegal: body.acceptedLegal } };
+  const paymentMethod = body.paymentMethod === "UPI_MANUAL" ? "UPI_MANUAL" : body.paymentMethod === "RAZORPAY" || body.paymentMethod === undefined ? "RAZORPAY" : null;
+  if (!paymentMethod) return { ok: false, error: "Unsupported payment method" };
+  return { ok: true, value: { skuIds: body.skuIds, acceptedLegal: body.acceptedLegal, paymentMethod } };
 }

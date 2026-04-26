@@ -211,6 +211,9 @@ model Order {
   status          OrderStatus @default(PENDING_PAYMENT)
   amountInPaise   Int
   currency        String      @default("INR")
+  paymentProvider String      @default("razorpay")
+  providerOrderId String?     @unique
+  paymentReference String?
   razorpayOrderId String?     @unique
   itemsJson       String
   payments        Payment[]
@@ -232,6 +235,34 @@ model Payment {
   rawEventJson       String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
+}
+
+model UpiReconciliation {
+  id         String   @id @default(cuid())
+  orderId    String
+  verifiedBy String
+  reference  String
+  proofUrl   String?
+  note       String?
+  status     String
+  approvedBy String?
+  approvedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("upi_reconciliations")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String
+  actorId     String?
+  subjectId   String?
+  severity    String
+  payloadJson String?
+  createdAt   DateTime @default(now())
+
+  @@map("audit_log")
 }
 
 model UserAccess {
