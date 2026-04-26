@@ -6,7 +6,7 @@ import { requireFeature, routeError } from "../../../../lib/auth";
 
 export async function GET() {
   try {
-    await requireFeature("runtimeStatus");
+    await requireFeature("publicApi");
     await ensureRadioStateReady();
     return Response.json(getRadioState());
   } catch (error) {

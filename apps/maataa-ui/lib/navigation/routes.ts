@@ -39,6 +39,7 @@ export const routeRegistry: RouteAccess[] = [
   { pattern: "/api/checkout", featureKey: "checkout" },
   { pattern: "/api/spine/events", featureKey: "spineEvents" },
   { pattern: "/api/partnerships", featureKey: "publicApi" },
+  { pattern: "/api/runtime/radio", featureKey: "publicApi", exact: true },
   { pattern: "/api/runtime/timeline", featureKey: "runtimeTimeline" },
   { pattern: "/api/runtime", featureKey: "runtimeStatus" },
   { pattern: "/api/proof/anchor", featureKey: "anchor" },
