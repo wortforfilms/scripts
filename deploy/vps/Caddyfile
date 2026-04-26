@@ -14,7 +14,23 @@
 		X-Frame-Options "SAMEORIGIN"
 		Referrer-Policy "strict-origin-when-cross-origin"
 	}
-	reverse_proxy maataa-ui:3000
+	handle /auth* {
+		reverse_proxy auth-service:8000
+	}
+	handle {
+		reverse_proxy maataa-ui:3000
+	}
+}
+
+{$AUTH_SITE_ADDRESSES} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+	reverse_proxy auth-service:8000
 }
 
 {$RADIO_SITE_ADDRESSES} {

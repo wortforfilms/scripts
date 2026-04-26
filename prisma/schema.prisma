@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -117,15 +117,46 @@ model User {
   email           String        @unique
   name            String
   passwordHash    String        @map("password_hash")
-  passwordSalt    String        @map("password_salt")
+  passwordSalt    String?       @map("password_salt")
   role            UserRole      @default(USER)
   plan            String        @default("FREE")
   permissionsJson String        @default("[]") @map("permissions_json")
   accounts        UserAccount[]
+  sessions        Session[]
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
   @@map("auth_users")
+}
+
+model Session {
+  id            String         @id
+  userId        String         @map("user_id")
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+  userAgent     String?        @map("user_agent")
+  ipAddress     String?        @map("ip_address")
+  expiresAt     DateTime       @map("expires_at")
+  revokedAt     DateTime?      @map("revoked_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("auth_sessions")
+}
+
+model RefreshToken {
+  id        String    @id
+  sessionId String    @map("session_id")
+  session   Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([sessionId])
+  @@map("auth_refresh_tokens")
 }
 
 model Account {
