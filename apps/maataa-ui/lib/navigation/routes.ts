@@ -50,6 +50,7 @@ export const routeRegistry: RouteAccess[] = [
   { pattern: "/admin/catalog", featureKey: "adminCatalog" },
   { pattern: "/admin/skus/review", featureKey: "adminSkuReview" },
   { pattern: "/admin/scripts/verification", featureKey: "adminScriptVerification" },
+  { pattern: "/admin/scripts/proof", featureKey: "adminScriptVerification" },
   { pattern: "/admin/orders", featureKey: "adminOrders" },
   { pattern: "/admin/spine", featureKey: "adminSpine" },
   { pattern: "/admin/finance", featureKey: "adminFinance" },

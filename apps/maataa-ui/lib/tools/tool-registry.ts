@@ -257,6 +257,15 @@ export const toolRegistry = [
     description: "Verify script records and glyph policy."
   },
   {
+    id: "adminScriptProofs",
+    name: "Script Proofs",
+    category: "Admin",
+    phase: "MVP",
+    route: "/admin/scripts/proof",
+    featureKey: "adminScriptVerification",
+    description: "Add sourced draft script proofs without publishing or assigning verified status."
+  },
+  {
     id: "adminDatasetQa",
     name: "Dataset QA",
     category: "Admin",

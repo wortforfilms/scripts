@@ -11,6 +11,7 @@ import {
 import { createRevenueSplitLedger, ensureRevenueDb } from "./revenue/create-ledger";
 import { recordSpineEvent } from "./spine";
 import { recordAudit } from "./logging/audit";
+import type { ScriptDirection, ScriptSystemType, VerificationStatus } from "./script-data";
 
 export type CatalogSku = {
   id: string;
@@ -24,6 +25,30 @@ export type CatalogSku = {
 };
 
 export type PaymentProvider = "razorpay" | "upi_manual";
+
+export type ScriptProofStatus = "DRAFT" | "REVIEW" | "APPROVED" | "REJECTED";
+
+export type ScriptProofSubmission = {
+  id: string;
+  slug: string;
+  name: string;
+  nativeName: string;
+  direction: ScriptDirection;
+  systemType: ScriptSystemType;
+  verificationStatus: VerificationStatus;
+  unicodeSupported: boolean;
+  unicodeRanges: string[];
+  fallbackGlyphAsset: string;
+  sources: string[];
+  evidenceNote: string;
+  proofUrl: string | null;
+  status: ScriptProofStatus;
+  submittedBy: string;
+  reviewedBy: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export async function quoteSkus(skuIds: string[]) {
   const publicSkus = await listSkus(true);
@@ -155,8 +180,198 @@ export async function ensureCatalogDb() {
       updated_at TEXT NOT NULL
     )
   `);
+  await runtimeDb.execute(`
+    CREATE TABLE IF NOT EXISTS script_proof_submissions (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL,
+      name TEXT NOT NULL,
+      native_name TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      system_type TEXT NOT NULL,
+      verification_status TEXT NOT NULL,
+      unicode_supported INTEGER NOT NULL DEFAULT 0,
+      unicode_ranges_json TEXT NOT NULL,
+      fallback_glyph_asset TEXT NOT NULL,
+      sources_json TEXT NOT NULL,
+      evidence_note TEXT NOT NULL,
+      proof_url TEXT,
+      status TEXT NOT NULL DEFAULT 'DRAFT',
+      submitted_by TEXT NOT NULL,
+      reviewed_by TEXT,
+      review_note TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
   await ensureRevenueDb();
   catalogInitialized = true;
+}
+
+function parseLines(value: string) {
+  return value.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean);
+}
+
+function normalizeSlug(value: string) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function assertEnum<T extends string>(value: string, allowed: readonly T[], fallback: T): T {
+  return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+function rowToScriptProof(row: Record<string, unknown>): ScriptProofSubmission {
+  return {
+    id: String(row.id),
+    slug: String(row.slug),
+    name: String(row.name),
+    nativeName: String(row.native_name),
+    direction: String(row.direction) as ScriptDirection,
+    systemType: String(row.system_type) as ScriptSystemType,
+    verificationStatus: String(row.verification_status) as VerificationStatus,
+    unicodeSupported: Boolean(Number(row.unicode_supported)),
+    unicodeRanges: JSON.parse(String(row.unicode_ranges_json)) as string[],
+    fallbackGlyphAsset: String(row.fallback_glyph_asset),
+    sources: JSON.parse(String(row.sources_json)) as string[],
+    evidenceNote: String(row.evidence_note),
+    proofUrl: row.proof_url ? String(row.proof_url) : null,
+    status: String(row.status) as ScriptProofStatus,
+    submittedBy: String(row.submitted_by),
+    reviewedBy: row.reviewed_by ? String(row.reviewed_by) : null,
+    reviewNote: row.review_note ? String(row.review_note) : null,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at)
+  };
+}
+
+export async function createScriptProofSubmission(input: {
+  slug: string;
+  name: string;
+  nativeName: string;
+  direction: string;
+  systemType: string;
+  verificationStatus: string;
+  unicodeSupported: boolean;
+  unicodeRanges: string;
+  fallbackGlyphAsset: string;
+  sources: string;
+  evidenceNote: string;
+  proofUrl?: string | null;
+  actorId: string;
+}) {
+  await ensureCatalogDb();
+  const slug = normalizeSlug(input.slug);
+  const name = input.name.trim();
+  const nativeName = input.nativeName.trim();
+  const fallbackGlyphAsset = input.fallbackGlyphAsset.trim();
+  const evidenceNote = input.evidenceNote.trim();
+  const sources = parseLines(input.sources);
+  const unicodeRanges = parseLines(input.unicodeRanges);
+  const verificationStatus = assertEnum(input.verificationStatus, ["UNVERIFIED", "PARTIAL"] as const, "UNVERIFIED");
+  const direction = assertEnum(input.direction, ["LTR", "RTL", "TTB", "BTT", "MIXED"] as const, "LTR");
+  const systemType = assertEnum(input.systemType, ["UNICODE_SCRIPT", "SPECIAL", "MANUSCRIPT_CHAIN", "TRANSMISSION"] as const, "UNICODE_SCRIPT");
+
+  if (!slug) throw new Error("Script slug is required");
+  if (!name) throw new Error("Script name is required");
+  if (!nativeName) throw new Error("Native name is required");
+  if (!fallbackGlyphAsset) throw new Error("Fallback glyph asset is required");
+  if (sources.length === 0) throw new Error("At least one source is required");
+  if (!evidenceNote) throw new Error("Evidence note is required");
+  if (input.unicodeSupported && unicodeRanges.length === 0) throw new Error("Unicode ranges are required when Unicode support is claimed");
+  if (unicodeRanges.some((range) => !/^U\+[0-9A-F]{4,6}(?:-U\+[0-9A-F]{4,6})?$/.test(range))) {
+    throw new Error("Unicode ranges must use U+XXXX or U+XXXX-U+XXXX format");
+  }
+
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  await runtimeDb.execute({
+    sql: `
+      INSERT INTO script_proof_submissions (
+        id, slug, name, native_name, direction, system_type, verification_status, unicode_supported,
+        unicode_ranges_json, fallback_glyph_asset, sources_json, evidence_note, proof_url, status,
+        submitted_by, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?)
+    `,
+    args: [
+      id,
+      slug,
+      name,
+      nativeName,
+      direction,
+      systemType,
+      verificationStatus,
+      input.unicodeSupported ? 1 : 0,
+      JSON.stringify(unicodeRanges),
+      fallbackGlyphAsset,
+      JSON.stringify(sources),
+      evidenceNote,
+      input.proofUrl?.trim() || null,
+      input.actorId,
+      now,
+      now
+    ]
+  });
+  await recordAudit({
+    action: "SCRIPT_DRAFT_SUBMITTED",
+    actorId: input.actorId,
+    subjectId: id,
+    payload: { slug, verificationStatus, sources: sources.length, unicodeRanges: unicodeRanges.length }
+  });
+  await recordSpineEvent({ eventType: "SCRIPT_DRAFT_SUBMITTED", actorId: input.actorId, subjectId: id, payload: { slug, verificationStatus } });
+  return { id, status: "DRAFT" as const };
+}
+
+export async function listScriptProofSubmissions(limit = 80) {
+  await ensureCatalogDb();
+  const result = await runtimeDb.execute({
+    sql: `
+      SELECT id, slug, name, native_name, direction, system_type, verification_status, unicode_supported,
+        unicode_ranges_json, fallback_glyph_asset, sources_json, evidence_note, proof_url, status,
+        submitted_by, reviewed_by, review_note, created_at, updated_at
+      FROM script_proof_submissions
+      ORDER BY created_at DESC
+      LIMIT ?
+    `,
+    args: [limit]
+  });
+  return result.rows.map((row) => rowToScriptProof(row));
+}
+
+export async function reviewScriptProofSubmission(input: {
+  id: string;
+  action: "submit-review" | "approve" | "reject";
+  actorId: string;
+  reviewNote?: string;
+}) {
+  await ensureCatalogDb();
+  const existing = await runtimeDb.execute({ sql: "SELECT id, status, slug, verification_status FROM script_proof_submissions WHERE id = ?", args: [input.id] });
+  const row = existing.rows[0];
+  if (!row) throw new Error("Script proof submission not found");
+  const current = String(row.status) as ScriptProofStatus;
+  const next =
+    input.action === "submit-review"
+      ? "REVIEW"
+      : input.action === "approve"
+        ? "APPROVED"
+        : "REJECTED";
+  if (input.action === "submit-review" && current !== "DRAFT") throw new Error("Only DRAFT submissions can enter review");
+  if ((input.action === "approve" || input.action === "reject") && current !== "REVIEW") throw new Error("Only REVIEW submissions can be approved or rejected");
+  if (input.action === "approve" && String(row.verification_status) === "VERIFIED") {
+    throw new Error("Verified status is not assigned from draft proof submissions");
+  }
+  const now = new Date().toISOString();
+  await runtimeDb.execute({
+    sql: "UPDATE script_proof_submissions SET status = ?, reviewed_by = ?, review_note = COALESCE(?, review_note), updated_at = ? WHERE id = ?",
+    args: [next, input.actorId, input.reviewNote?.trim() || null, now, input.id]
+  });
+  await recordAudit({
+    action: "SCRIPT_PROOF_REVIEWED",
+    actorId: input.actorId,
+    subjectId: input.id,
+    payload: { action: input.action, next, slug: String(row.slug) }
+  });
+  await recordSpineEvent({ eventType: "SCRIPT_PROOF_REVIEWED", actorId: input.actorId, subjectId: input.id, payload: { action: input.action, next } });
+  return { id: input.id, status: next };
 }
 
 function rowToSku(row: Record<string, unknown>): CatalogSku {

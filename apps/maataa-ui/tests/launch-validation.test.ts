@@ -221,6 +221,76 @@ describe("launch validation: own UPI manual reconciliation", () => {
   });
 });
 
+describe("launch validation: script proof submissions", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    process.env.RUNTIME_DATABASE_URL = `file:${join(tmpdir(), `maataa-script-proof-${randomUUID()}.db`)}`;
+    delete process.env.RUNTIME_DATABASE_AUTH_TOKEN;
+  });
+
+  it("stores added scripts as internal draft proof records and never as verified public data", async () => {
+    const { createScriptProofSubmission, listScriptProofSubmissions, reviewScriptProofSubmission } = await import("../lib/catalog-db");
+
+    await expect(createScriptProofSubmission({
+      slug: "unsafe-script",
+      name: "Unsafe Script",
+      nativeName: "Unsafe Script",
+      direction: "LTR",
+      systemType: "UNICODE_SCRIPT",
+      verificationStatus: "VERIFIED",
+      unicodeSupported: true,
+      unicodeRanges: "",
+      fallbackGlyphAsset: "/glyph-placeholders/verification-required.svg",
+      sources: "Unicode proposal source",
+      evidenceNote: "Should fail because Unicode ranges are missing.",
+      actorId: "reviewer_script"
+    })).rejects.toThrow("Unicode ranges");
+
+    const draft = await createScriptProofSubmission({
+      slug: "candidate-script",
+      name: "Candidate Script",
+      nativeName: "Candidate Script",
+      direction: "RTL",
+      systemType: "MANUSCRIPT_CHAIN",
+      verificationStatus: "VERIFIED",
+      unicodeSupported: false,
+      unicodeRanges: "",
+      fallbackGlyphAsset: "/glyph-placeholders/verification-required.svg",
+      sources: "Museum catalogue item 123\nPeer-reviewed article pending",
+      evidenceNote: "Candidate record with evidence, still not verified.",
+      proofUrl: "https://archive.example/candidate-script",
+      actorId: "reviewer_script"
+    });
+    expect(draft.status).toBe("DRAFT");
+
+    const [submission] = await listScriptProofSubmissions();
+    expect(submission).toMatchObject({
+      slug: "candidate-script",
+      status: "DRAFT",
+      verificationStatus: "UNVERIFIED",
+      fallbackGlyphAsset: "/glyph-placeholders/verification-required.svg"
+    });
+
+    await expect(reviewScriptProofSubmission({
+      id: submission.id,
+      action: "approve",
+      actorId: "admin_script"
+    })).rejects.toThrow("Only REVIEW");
+
+    await expect(reviewScriptProofSubmission({
+      id: submission.id,
+      action: "submit-review",
+      actorId: "admin_script"
+    })).resolves.toMatchObject({ status: "REVIEW" });
+    await expect(reviewScriptProofSubmission({
+      id: submission.id,
+      action: "approve",
+      actorId: "admin_script",
+      reviewNote: "Proof accepted for internal queue only."
+    })).resolves.toMatchObject({ status: "APPROVED" });
+  });
+});
+
 describe("launch validation: revenue splits", () => {
   it("rejects split rules that do not total 10000 basis points", () => {
     expect(() => calculateSplits(1000, [{ party: "PLATFORM", accountId: null, basisPoints: 9000 }])).toThrow("10000");

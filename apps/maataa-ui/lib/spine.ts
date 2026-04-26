@@ -2,6 +2,8 @@ import { runtimeDb } from "./runtime-db";
 
 export type SpineEventType =
   | "SCRIPT_VERIFIED"
+  | "SCRIPT_DRAFT_SUBMITTED"
+  | "SCRIPT_PROOF_REVIEWED"
   | "SKU_GENERATED"
   | "SKU_SUBMITTED_FOR_REVIEW"
   | "SKU_APPROVED"

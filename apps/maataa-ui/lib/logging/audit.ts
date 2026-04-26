@@ -9,7 +9,9 @@ export type AuditAction =
   | "UPI_RECONCILIATION_APPROVED"
   | "UPI_RECONCILIATION_REJECTED"
   | "REVENUE_SPLIT_CREATED"
-  | "QA_FAILURE";
+  | "QA_FAILURE"
+  | "SCRIPT_DRAFT_SUBMITTED"
+  | "SCRIPT_PROOF_REVIEWED";
 
 export type AuditLogEntry = {
   id: string;

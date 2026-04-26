@@ -23,6 +23,7 @@ export const navItems: NavItem[] = [
   { label: "Catalog", href: "/admin/catalog", icon: "FolderKanban", featureKey: "adminCatalog", section: "admin" },
   { label: "SKU Review", href: "/admin/skus/review", icon: "BadgeCheck", featureKey: "adminSkuReview", section: "admin" },
   { label: "Verification", href: "/admin/scripts/verification", icon: "ScanText", featureKey: "adminScriptVerification", section: "admin" },
+  { label: "Script Proofs", href: "/admin/scripts/proof", icon: "FileCheck2", featureKey: "adminScriptVerification", section: "admin" },
   { label: "Orders", href: "/admin/orders", icon: "Receipt", featureKey: "adminOrders", section: "admin" },
   { label: "Spine", href: "/admin/spine", icon: "Cable", featureKey: "adminSpine", section: "admin" }
 ];
